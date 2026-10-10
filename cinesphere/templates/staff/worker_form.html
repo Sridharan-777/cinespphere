@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Add Field Worker — Staff Portal{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 580px;">
+    <div class="form-card" style="max-width: 100%;">
+        <h1 style="font-size: 1.8rem; font-family: var(--font-heading); margin-bottom: 0.3rem;">Onboard Field Worker</h1>
+        <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 1.8rem;">
+            Assign a maintenance, technical or cleaning operator to your theater (Slot {{ current_count + 1 }} of 20).
+        </p>
+
+        <form action="{{ url_for('staff.worker_create') }}" method="POST">
+            <div class="form-group">
+                <label class="form-label">Full Name</label>
+                <input type="text" name="name" class="form-control" placeholder="Ramesh Kumar" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Worker Email</label>
+                <input type="email" name="email" class="form-control" placeholder="ramesh@cinesphere.com" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Phone Number</label>
+                <input type="tel" name="phone" class="form-control" placeholder="+91 9876543210">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Department</label>
+                <select name="department" class="form-control">
+                    <option value="Housekeeping">Housekeeping & Sanitization</option>
+                    <option value="Projection & Audio">Projection & Audio Systems</option>
+                    <option value="Auditorium Operations">Auditorium & Ushering</option>
+                    <option value="Facility Maintenance">Facility & Electrical</option>
+                    <option value="Security & Safety">Security & Fire Safety</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Designation</label>
+                <input type="text" name="designation" class="form-control" value="Senior Screen Attendant" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Default Password</label>
+                <input type="password" name="password" class="form-control" value="Worker@123" required>
+                <small style="color: var(--text-muted);">Default: Worker@123</small>
+            </div>
+
+            <div style="display: flex; gap: 0.8rem; margin-top: 1.5rem;">
+                <button type="submit" class="btn btn-primary" style="flex: 1;">Register Worker</button>
+                <a href="{{ url_for('staff.workers_list') }}" class="btn btn-outline">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

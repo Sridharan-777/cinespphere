@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Register — CineSphere{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="form-card">
+        <h2 style="font-family: var(--font-heading); margin-bottom: 0.5rem; text-align: center;">Create Customer Account</h2>
+        <p style="color: var(--text-muted); font-size: 0.88rem; text-align: center; margin-bottom: 1.8rem;">
+            Join CineSphere for seamless online ticket reservations, food pre-orders, and verified movie reviews.
+        </p>
+
+        <form action="{{ url_for('auth.register') }}" method="POST">
+            <div class="form-group">
+                <label class="form-label">Full Name</label>
+                <input type="text" name="name" class="form-control" placeholder="John Doe" value="{{ name or '' }}" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Email Address</label>
+                <input type="email" name="email" class="form-control" placeholder="john@example.com" value="{{ email or '' }}" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Phone Number</label>
+                <input type="tel" name="phone" class="form-control" placeholder="+91 9876543210" value="{{ phone or '' }}">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Password</label>
+                <input type="password" name="password" class="form-control" placeholder="Minimum 6 characters" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Confirm Password</label>
+                <input type="password" name="confirm_password" class="form-control" placeholder="Repeat password" required>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem; padding: 0.75rem;">
+                Create Account
+            </button>
+        </form>
+
+        <div style="margin-top: 1.5rem; text-align: center; font-size: 0.88rem; color: var(--text-muted);">
+            Already have an account? <a href="{{ url_for('auth.login') }}" style="color: var(--primary); font-weight: 600;">Sign In</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

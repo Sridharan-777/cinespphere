@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}Staff Dashboard — CineSphere{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 2rem; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div>
+            <span class="chip" style="background: #2563eb; color: #fff; margin-bottom: 0.5rem; display: inline-block;">STAFF OPERATIONS CONSOLE</span>
+            <h1 style="font-size: 2rem; font-family: var(--font-heading);">{{ theater.name if theater else 'CineSphere' }}</h1>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">Assigned Location • Max 5 Staff • Max 20 Field Workers Policy Enforced</p>
+        </div>
+        <div style="display: flex; gap: 0.8rem;">
+            <a href="{{ url_for('staff.shows_list') }}" class="btn btn-primary">Schedule Show</a>
+            <a href="{{ url_for('staff.tasks') }}" class="btn btn-outline">Assign Task</a>
+        </div>
+    </div>
+
+    <!-- Capacity & Financial Stats -->
+    <div class="dashboard-grid">
+        <div class="stat-card" style="border-top: 3px solid #2563eb;">
+            <div class="stat-title">Shows Today</div>
+            <div class="stat-value">{{ operations.shows_today }}</div>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">Scheduled at this location</span>
+        </div>
+
+        <div class="stat-card" style="border-top: 3px solid #d97706;">
+            <div class="stat-title">Seats Reserved Today</div>
+            <div class="stat-value">{{ operations.seats_reserved }}</div>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">{{ operations.occupancy_today }}% scheduled-seat occupancy</span>
+        </div>
+
+        <div class="stat-card" style="border-top: 3px solid var(--success);">
+            <div class="stat-title">Today's Revenue</div>
+            <div class="stat-value" style="color: var(--success);">₹{{ stats.today_revenue }}</div>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">{{ stats.today_bookings }} bookings today</span>
+        </div>
+
+        <div class="stat-card" style="border-top: 3px solid var(--primary);">
+            <div class="stat-title">Open Operational Tasks</div>
+            <div class="stat-value" style="color: var(--accent);">{{ stats.pending_tasks }}</div>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">Requires staff follow-up</span>
+        </div>
+    </div>
+
+    <!-- Quick Operations Navigation -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2.5rem;">
+        <a href="{{ url_for('staff.customers_list') }}" class="stat-card" style="text-align: center; cursor: pointer;">
+            <div style="font-size: 1.8rem; margin-bottom: 0.4rem;">👥</div>
+            <strong>Theater Patrons</strong>
+            <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem;">Booking lookup and visit history</p>
+        </a>
+
+        <a href="{{ url_for('staff.workers_list') }}" class="stat-card" style="text-align: center; cursor: pointer;">
+            <div style="font-size: 1.8rem; margin-bottom: 0.4rem;">🛠</div>
+            <strong>Field Workers ({{ stats.worker_count }}/20)</strong>
+            <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem;">Roster, departments & tasks</p>
+        </a>
+
+        <a href="{{ url_for('staff.shows_list') }}" class="stat-card" style="text-align: center; cursor: pointer;">
+            <div style="font-size: 1.8rem; margin-bottom: 0.4rem;">📽</div>
+            <strong>Showtimes & Screens</strong>
+            <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem;">Timetable & clash prevention</p>
+        </a>
+
+        <a href="{{ url_for('staff.reports') }}" class="stat-card" style="text-align: center; cursor: pointer;">
+            <div style="font-size: 1.8rem; margin-bottom: 0.4rem;">📊</div>
+            <strong>Theater Reports</strong>
+            <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem;">Occupancy & sales breakdown</p>
+        </a>
+    </div>
+
+    <!-- Recent Bookings in This Theater -->
+    <div class="section-header">
+        <h2 class="section-title">Recent Theater Bookings</h2>
+    </div>
+
+    <div class="table-responsive">
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Code</th>
+                    <th>Movie</th>
+                    <th>Screen</th>
+                    <th>Show Time</th>
+                    <th>Seats</th>
+                    <th>Paid</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for b in recent_bookings %}
+                <tr>
+                    <td><code>{{ b.booking_code }}</code></td>
+                    <td><strong>{{ b.movie_title }}</strong></td>
+                    <td>{{ b.screen_name }}</td>
+                    <td>{{ b.show_date }} {{ b.start_time }}</td>
+                    <td><strong style="color: var(--accent);">{{ b.seats|join(', ') }}</strong></td>
+                    <td>₹{{ b.pricing.grand_total }}</td>
+                    <td><span class="badge" style="background: rgba(34, 197, 94, 0.2); color: #86efac;">{{ b.status }}</span></td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">No bookings recorded for this location yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

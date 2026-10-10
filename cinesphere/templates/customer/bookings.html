@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}My Bookings — CineSphere{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="section-header">
+        <h1 class="section-title">My Ticket Bookings</h1>
+    </div>
+
+    {% if bookings %}
+    <div class="table-responsive">
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Booking Code</th>
+                    <th>Movie</th>
+                    <th>Theater & Screen</th>
+                    <th>Date & Time</th>
+                    <th>Seats</th>
+                    <th>Total</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for b in bookings %}
+                <tr>
+                    <td><code>{{ b.booking_code }}</code></td>
+                    <td><strong>{{ b.movie_title }}</strong></td>
+                    <td>{{ b.theater_name }}<br><small style="color: var(--text-muted);">{{ b.screen_name }}</small></td>
+                    <td>{{ b.show_date }}<br><small style="color: var(--text-muted);">{{ b.start_time }}</small></td>
+                    <td><span style="color: var(--accent); font-weight: 700;">{{ b.seats|join(', ') }}</span></td>
+                    <td>₹{{ b.pricing.grand_total }}</td>
+                    <td>
+                        {% if b.status == 'Confirmed' %}
+                        <span class="badge" style="background: rgba(34, 197, 94, 0.2); color: #86efac;">Confirmed</span>
+                        {% else %}
+                        <span class="badge" style="background: rgba(239, 68, 68, 0.2); color: #fca5a5;">Cancelled</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <a href="{{ url_for('booking.ticket', booking_code=b.booking_code) }}" target="_blank" class="btn btn-sm btn-outline">Ticket</a>
+                            {% if b.status == 'Confirmed' %}
+                            <form action="{{ url_for('customer.cancel_booking', booking_code=b.booking_code) }}" method="POST" onsubmit="return confirm('Cancel this booking and get a simulated refund?')">
+                                <button type="submit" class="btn btn-sm btn-danger">Cancel</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div style="background: var(--bg-card); border-radius: 12px; padding: 4rem 2rem; text-align: center;">
+        <h3>No ticket bookings found</h3>
+        <p style="color: var(--text-muted); margin: 0.5rem 0 1.5rem;">Discover our latest movies and book your tickets today.</p>
+        <a href="{{ url_for('movies.movie_list') }}" class="btn btn-primary">Browse Now Showing</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

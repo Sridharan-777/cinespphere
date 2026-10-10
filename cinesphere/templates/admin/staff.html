@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Staff — Admin Console{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="section-header">
+        <div>
+            <h1 class="section-title">Staff Management</h1>
+            <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.3rem;">
+                Policy: <strong>Exactly 5 staff members maximum</strong> per individual theater.
+            </p>
+        </div>
+    </div>
+
+    <!-- Onboard Staff Form -->
+    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.8rem; margin-bottom: 2.5rem;">
+        <h3 style="font-size: 1.2rem; margin-bottom: 0.5rem;">Assign Staff to Theater</h3>
+        <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 1.5rem;">Staff accounts oversee shows, customers, ticket validations, and worker operations.</p>
+
+        <form action="{{ url_for('admin.staff_management') }}" method="POST">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">Full Name</label>
+                    <input type="text" name="name" class="form-control" placeholder="Priya Sharma" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email Address</label>
+                    <input type="email" name="email" class="form-control" placeholder="priya@cinesphere.com" required>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">Assign to Theater</label>
+                    <select name="theater_id" class="form-control" required>
+                        {% for t in theaters %}
+                        <option value="{{ t._id }}">{{ t.name }} ({{ t.city }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Designation</label>
+                    <input type="text" name="designation" class="form-control" value="Theater Operations Manager" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Initial Password</label>
+                <input type="password" name="password" class="form-control" value="Staff@1234" required>
+                <small style="color: var(--text-muted);">Default: Staff@1234</small>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="margin-top: 1rem;">Authorize Staff Member</button>
+        </form>
+    </div>
+
+    <!-- Staff List -->
+    <div class="table-responsive">
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Emp Code</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Assigned Theater</th>
+                    <th>Designation</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in staff_list %}
+                <tr>
+                    <td><code>{{ s.employee_code }}</code></td>
+                    <td><strong>{{ s.name }}</strong></td>
+                    <td>{{ s.email }}</td>
+                    <td>{{ s.theater_name }}</td>
+                    <td>{{ s.designation }}</td>
+                    <td>
+                        <span class="badge" style="background: {% if s.status == 'active' %}rgba(34, 197, 94, 0.2); color: #86efac;{% else %}rgba(239, 68, 68, 0.2); color: #fca5a5;{% endif %}">
+                            {{ s.status|upper }}
+                        </span>
+                    </td>
+                    <td>
+                        <form action="{{ url_for('admin.staff_toggle_status', staff_id=s._id) }}" method="POST">
+                            <button type="submit" class="btn btn-sm {% if s.status == 'active' %}btn-danger{% else %}btn-success{% endif %}">
+                                {% if s.status == 'active' %}Deactivate{% else %}Activate{% endif %}
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

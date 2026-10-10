@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}CineSphere Theater Locations{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="section-header">
+        <h1 class="section-title">CineSphere Theaters</h1>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 1.5rem;">
+        {% for t in theaters %}
+        <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.8rem; display: flex; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+                <h2 style="font-size: 1.4rem; font-family: var(--font-heading);">{{ t.name }}</h2>
+                <span class="badge" style="background: rgba(34, 197, 94, 0.2); color: #86efac;">Active</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">📍 {{ t.address }}, {{ t.city }}</p>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; background: var(--bg-secondary); padding: 0.8rem; border-radius: 8px; margin-bottom: 1.2rem; font-size: 0.85rem;">
+                <div><strong>Screens:</strong> {{ t.screen_count }} Screens</div>
+                <div><strong>Phone:</strong> {{ t.phone or '+91 22 4567 8900' }}</div>
+            </div>
+
+            <div style="display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1.5rem;">
+                {% for f in t.facilities %}
+                <span class="badge">{{ f }}</span>
+                {% endfor %}
+            </div>
+
+            <a href="{{ url_for('public.theater_details', theater_id=t._id) }}" class="btn btn-primary" style="margin-top: auto;">
+                View Showtimes & Screens
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

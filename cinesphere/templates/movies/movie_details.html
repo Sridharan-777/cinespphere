@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block title %}{{ movie.title }} — CineSphere{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Hero Details Banner -->
+    <div class="details-hero">
+        <div>
+            <img src="{{ movie.poster_url }}" alt="{{ movie.title }}" class="details-poster">
+            {% if session.get('user_id') and session.get('role') == 'customer' %}
+            <form action="{{ url_for('customer.toggle_favorite', movie_id=movie._id) }}" method="POST" style="margin-top: 1rem;">
+                <button type="submit" class="btn btn-outline" style="width: 100%;">❤️ Add to Favorites</button>
+            </form>
+            {% endif %}
+        </div>
+
+        <div class="details-info">
+            <h1>{{ movie.title }}</h1>
+            <div style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 0.8rem;">Original Title: {{ movie.original_title }}</div>
+
+            <div style="display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem;">
+                <span style="font-size: 1.3rem; font-weight: 800; color: var(--accent);">⭐ {{ movie.rating }} / 10</span>
+                <span style="color: var(--text-muted); font-size: 0.88rem;">({{ movie.vote_count }} TMDB votes)</span>
+                <span class="chip" style="background: var(--primary); color: white;">{{ movie.status }}</span>
+            </div>
+
+            <div class="details-chips">
+                <span class="chip">⏱ {{ movie.runtime }} mins</span>
+                <span class="chip">📅 Release: {{ movie.release_date }}</span>
+                <span class="chip">🗣 Language: {{ movie.language }}</span>
+                {% for g in movie.genres %}
+                <span class="chip">{{ g }}</span>
+                {% endfor %}
+            </div>
+
+            <h3 style="margin: 1.5rem 0 0.5rem; font-size: 1.1rem;">Overview</h3>
+            <p style="color: #d1d1d6; line-height: 1.6; font-size: 0.95rem;">{{ movie.overview }}</p>
+
+            <div style="margin-top: 1.5rem; display: flex; gap: 2rem; font-size: 0.9rem;">
+                <div>
+                    <span style="color: var(--text-muted); display: block;">Director</span>
+                    <strong>{{ movie.director }}</strong>
+                </div>
+                {% if movie.writers %}
+                <div>
+                    <span style="color: var(--text-muted); display: block;">Writers</span>
+                    <strong>{{ movie.writers|join(', ') }}</strong>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Cast Members -->
+            <h3 style="margin: 2rem 0 0.8rem; font-size: 1.1rem;">Starring Cast</h3>
+            <div class="cast-grid">
+                {% for actor in movie.cast %}
+                <a href="{{ url_for('movies.actor_details', actor_id=actor.id) }}" class="cast-card">
+                    <img src="{{ actor.profile_path or url_for('static', filename='images/default_actor.svg') }}" alt="{{ actor.name }}" class="cast-img" loading="lazy">
+                    <div class="cast-name">{{ actor.name }}</div>
+                    <div class="cast-role">{{ actor.character }}</div>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Available Theater Showtimes -->
+    <div class="section-header">
+        <h2 class="section-title">Available Showtimes & Tickets</h2>
+    </div>
+
+    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 3rem;">
+        {% if showtimes %}
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+            {% for s in showtimes %}
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; padding: 1rem; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border);">
+                <div>
+                    <h3 style="font-size: 1.1rem; margin-bottom: 0.2rem;">🏛 {{ s.theater_name }}</h3>
+                    <p style="color: var(--text-muted); font-size: 0.85rem;">{{ s.screen_name }} ({{ s.screen_type }}) • {{ s.show_date }}</p>
+                </div>
+                <div style="display: flex; align-items: center; gap: 1.5rem;">
+                    <div style="text-align: right;">
+                        <span style="display: block; font-weight: 700; font-size: 1.1rem; color: #fff;">{{ s.start_time }}</span>
+                        <span style="font-size: 0.8rem; color: var(--success);">{{ s.available_seats_count }} seats left</span>
+                    </div>
+                    <div style="text-align: right;">
+                        <span style="font-size: 1.1rem; font-weight: 800; color: var(--accent);">₹{{ s.base_price }}</span>
+                        <span style="font-size: 0.75rem; color: var(--text-muted); display: block;">Base price</span>
+                    </div>
+                    <a href="{{ url_for('booking.select_seats', showtime_id=s._id) }}" class="btn btn-primary">Book Seats</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p style="color: var(--text-muted); text-align: center; padding: 2rem;">No active showtimes currently scheduled for this movie. Check back soon or browse other movies!</p>
+        {% endif %}
+    </div>
+
+    <!-- Verified Customer Reviews Section -->
+    <div class="section-header">
+        <h2 class="section-title">Customer Reviews & Ratings ({{ total_reviews }})</h2>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 300px 1fr; gap: 2rem; margin-bottom: 3rem;">
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+            <!-- Rating Breakdown Card -->
+            <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem;">
+                <div style="text-align: center; margin-bottom: 1.5rem;">
+                    <div style="font-size: 3rem; font-weight: 800; font-family: var(--font-heading); color: var(--accent);">{{ movie.rating }}</div>
+                    <div style="color: var(--text-muted); font-size: 0.85rem;">Overall CineSphere Rating</div>
+                </div>
+                {% for star, data in rating_bars.items() %}
+                <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem; font-size: 0.85rem;">
+                    <span>{{ star }} ★</span>
+                    <div style="flex: 1; height: 8px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden;">
+                        <div style="width: {{ data.pct }}%; height: 100%; background: var(--accent);"></div>
+                    </div>
+                    <span style="color: var(--text-muted); font-size: 0.8rem; width: 40px; text-align: right;">{{ data.pct }}%</span>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Write a Review Form -->
+            {% if session.get('user_id') and session.get('role') == 'customer' %}
+            <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem;">
+                <h3 style="font-size: 1.1rem; margin-bottom: 1rem;">Write a Review</h3>
+                <form action="{{ url_for('customer.my_reviews') }}" method="POST">
+                    <input type="hidden" name="movie_id" value="{{ movie._id }}">
+                    <div style="margin-bottom: 0.8rem;">
+                        <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Rating (1-5)</label>
+                        <select name="rating" class="form-control" required style="background: var(--bg-secondary); border: 1px solid var(--border); color: #fff; padding: 0.5rem; border-radius: 4px; width: 100%;">
+                            <option value="5">5 ★ - Excellent</option>
+                            <option value="4">4 ★ - Good</option>
+                            <option value="3">3 ★ - Average</option>
+                            <option value="2">2 ★ - Poor</option>
+                            <option value="1">1 ★ - Terrible</option>
+                        </select>
+                    </div>
+                    <div style="margin-bottom: 0.8rem;">
+                        <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Title</label>
+                        <input type="text" name="title" required class="form-control" style="background: var(--bg-secondary); border: 1px solid var(--border); color: #fff; padding: 0.5rem; border-radius: 4px; width: 100%;">
+                    </div>
+                    <div style="margin-bottom: 1rem;">
+                        <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Comment</label>
+                        <textarea name="comment" required class="form-control" rows="3" style="background: var(--bg-secondary); border: 1px solid var(--border); color: #fff; padding: 0.5rem; border-radius: 4px; width: 100%;"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">Submit Review</button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Reviews List -->
+        <div>
+            {% for r in reviews %}
+            <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 1.2rem; margin-bottom: 1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+                    <div>
+                        <strong>{{ r.customer_name }}</strong>
+                        {% if r.is_verified %}
+                        <span class="badge" style="background: rgba(34, 197, 94, 0.2); color: #86efac; border-color: rgba(34, 197, 94, 0.4); margin-left: 0.4rem;">✓ Verified Booking</span>
+                        {% endif %}
+                    </div>
+                    <span style="color: var(--accent); font-weight: 700;">{{ '★' * r.rating }}{{ '☆' * (5 - r.rating) }}</span>
+                </div>
+                <h4 style="font-size: 0.95rem; margin-bottom: 0.3rem;">{{ r.title }}</h4>
+                <p style="color: #d1d1d6; font-size: 0.88rem; line-height: 1.5;">{{ r.comment }}</p>
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.6rem;">{{ r.created_at.strftime('%d %b %Y') if r.created_at else '' }}</div>
+            </div>
+            {% else %}
+            <p style="color: var(--text-muted); padding: 2rem; background: var(--bg-card); border-radius: 10px; text-align: center;">No reviews written yet. Book a ticket and be the first to review!</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

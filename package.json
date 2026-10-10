@@ -1,0 +1,12 @@
+{
+  "name": "cinesphere",
+  "version": "1.0.0",
+  "description": "CineSphere Movie Theater Management & Ticket Booking Web Application",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "build": "echo 'Build successful' && exit 0"
+  },
+  "dependencies": {}
+}

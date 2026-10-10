@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}System Admin Dashboard — CineSphere{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 2rem; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div>
+            <span class="chip" style="background: #dc2626; color: #fff; margin-bottom: 0.5rem; display: inline-block;">CENTRAL ADMIN CONSOLE</span>
+            <h1 style="font-size: 2rem; font-family: var(--font-heading);">CineSphere Enterprise Overview</h1>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">Multi-theater supervision, global staff/worker limits, and real TMDB sync.</p>
+        </div>
+        <div style="display: flex; gap: 0.8rem;">
+            <form action="{{ url_for('admin.sync_tmdb_movies') }}" method="POST">
+                <button type="submit" class="btn btn-accent">⚡ Sync Movies from TMDB</button>
+            </form>
+            <a href="{{ url_for('admin.export_report') }}" class="btn" style="background-color: #10b981; color: white; border: none; font-weight: 600;">Export Users CSV</a>
+            <a href="{{ url_for('admin.theaters') }}" class="btn btn-primary">+ Add Theater</a>
+        </div>
+    </div>
+
+    <!-- Global KPI Cards -->
+    <div class="dashboard-grid">
+        <div class="stat-card" style="border-top: 3px solid var(--primary);">
+            <div class="stat-title">Total Box Office Revenue</div>
+            <div class="stat-value" style="color: var(--accent);">₹{{ stats.total_revenue }}</div>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">₹{{ stats.today_revenue }} collected today</span>
+        </div>
+
+        <div class="stat-card" style="border-top: 3px solid var(--success);">
+            <div class="stat-title">Total System Bookings</div>
+            <div class="stat-value" style="color: var(--success);">{{ stats.total_bookings }}</div>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">{{ stats.today_bookings }} today</span>
+        </div>
+
+        <div class="stat-card" style="border-top: 3px solid #2563eb;">
+            <div class="stat-title">Active Theaters</div>
+            <div class="stat-value" style="color: #60a5fa;">{{ stats.total_theaters }}</div>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Locations nationwide</span>
+        </div>
+
+        <div class="stat-card" style="border-top: 3px solid #d97706;">
+            <div class="stat-title">Total Users (RBAC)</div>
+            <div class="stat-value" style="color: #fcd34d;">{{ stats.total_users }}</div>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">{{ stats.total_customers }} Customers • {{ stats.total_staff }} Staff • {{ stats.total_workers }} Workers</span>
+        </div>
+    </div>
+
+    <!-- Theater Performance Grid -->
+    <div class="section-header" style="margin-top: 2rem;">
+        <h2 class="section-title">Theaters & Capacity Allocation</h2>
+        <a href="{{ url_for('admin.theaters') }}" class="btn btn-sm btn-outline">Manage Theaters</a>
+    </div>
+
+    <div class="dashboard-grid">
+        {% for t in theaters %}
+        <div class="stat-card">
+            <h3 style="font-size: 1.2rem; margin-bottom: 0.3rem;">🏛 {{ t.name }}</h3>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">📍 {{ t.city }} • {{ t.screen_count }} Screens</p>
+
+            <div style="margin-bottom: 0.8rem;">
+                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 0.3rem;">
+                    <span>Staff (Max 5):</span>
+                    <strong>{{ t.staff_count }} / 5</strong>
+                </div>
+                <div style="height: 6px; background: var(--bg-secondary); border-radius: 3px; overflow: hidden;">
+                    <div style="height: 100%; width: {{ (t.staff_count / 5) * 100 }}%; background: #2563eb;"></div>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 1.2rem;">
+                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 0.3rem;">
+                    <span>Workers (Max 20):</span>
+                    <strong>{{ t.worker_count }} / 20</strong>
+                </div>
+                <div style="height: 6px; background: var(--bg-secondary); border-radius: 3px; overflow: hidden;">
+                    <div style="height: 100%; width: {{ (t.worker_count / 20) * 100 }}%; background: #d97706;"></div>
+                </div>
+            </div>
+
+            <a href="{{ url_for('admin.theater_details', theater_id=t._id) }}" class="btn btn-sm btn-outline" style="width: 100%;">Inspect Theater</a>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- System Audit Log preview -->
+    <div class="section-header" style="margin-top: 2rem;">
+        <h2 class="section-title">Security & Audit Activity Trail</h2>
+        <a href="{{ url_for('admin.audit_logs') }}" class="btn btn-sm btn-outline">Full Audit Logs</a>
+    </div>
+
+    <div class="table-responsive">
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>User</th>
+                    <th>Role</th>
+                    <th>Action</th>
+                    <th>Entity</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in recent_logs %}
+                <tr>
+                    <td>{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') if log.created_at else '' }}</td>
+                    <td>{{ log.user_email }}</td>
+                    <td><span class="role-tag role-{{ log.role }}">{{ log.role }}</span></td>
+                    <td><code>{{ log.action }}</code></td>
+                    <td>{{ log.entity }}</td>
+                    <td>{{ log.description }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No audit trails recorded.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

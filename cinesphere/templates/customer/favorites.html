@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}My Favorites — CineSphere{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="section-header">
+        <h1 class="section-title">My Favorite Movies & Watchlist</h1>
+    </div>
+
+    {% if movies %}
+    <div class="movie-grid">
+        {% for movie in movies %}
+        <div class="movie-card">
+            <div class="movie-card-poster-wrap">
+                <img src="{{ movie.poster_url }}" alt="{{ movie.title }}" class="movie-card-poster">
+                <span class="movie-card-badge">⭐ {{ movie.rating }}</span>
+            </div>
+            <div class="movie-card-body">
+                <h3 class="movie-card-title">{{ movie.title }}</h3>
+                <p class="movie-card-info">{{ movie.genres|slice(2)|first|join(' • ') }}</p>
+                <div class="movie-card-actions">
+                    <a href="{{ url_for('movies.movie_details', movie_id=movie._id) }}" class="btn btn-sm btn-primary" style="flex: 1;">Book Now</a>
+                    <form action="{{ url_for('customer.toggle_favorite', movie_id=movie._id) }}" method="POST">
+                        <button type="submit" class="btn btn-sm btn-outline" title="Remove">❌</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div style="background: var(--bg-card); border-radius: 12px; padding: 4rem 2rem; text-align: center;">
+        <h3>Your watchlist is empty</h3>
+        <p style="color: var(--text-muted); margin: 0.5rem 0 1.5rem;">Click the heart icon on any movie page to save it for later.</p>
+        <a href="{{ url_for('movies.movie_list') }}" class="btn btn-primary">Discover Movies</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

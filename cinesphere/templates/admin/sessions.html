@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Login Sessions — Admin Console{% endblock %}
+{% block content %}
+<div class="container">
+    <div class="section-header"><div>
+        <h1 class="section-title">Login Session History</h1>
+        <p style="color:var(--text-muted); margin:.35rem 0 0;">Who signed in, when they were last active, and when they explicitly logged out.</p>
+    </div></div>
+
+    <form method="GET" style="display:flex; gap:.8rem; flex-wrap:wrap; margin-bottom:1.5rem;">
+        <select name="status" class="form-control" style="width:auto;">
+            <option value="">All statuses</option>
+            <option value="active" {% if selected_status == 'active' %}selected{% endif %}>Active</option>
+            <option value="logged_out" {% if selected_status == 'logged_out' %}selected{% endif %}>Logged out</option>
+        </select>
+        <select name="role" class="form-control" style="width:auto;">
+            <option value="">All roles</option>
+            {% for role in ['admin', 'staff', 'worker', 'customer'] %}
+            <option value="{{ role }}" {% if selected_role == role %}selected{% endif %}>{{ role|title }}</option>
+            {% endfor %}
+        </select>
+        <button class="btn btn-outline" type="submit">Apply filters</button>
+        <a class="btn btn-outline" href="{{ url_for('admin.session_history') }}">Clear</a>
+    </form>
+
+    <div class="table-responsive"><table class="custom-table">
+        <thead><tr><th>User</th><th>Role</th><th>Login</th><th>Last Seen</th><th>Logout</th><th>Status</th><th>IP Address</th><th>Method / Device</th></tr></thead>
+        <tbody>
+        {% for item in sessions %}
+        <tr>
+            <td><strong>{{ item.name }}</strong><br><small style="color:var(--text-muted);">{{ item.email }}</small></td>
+            <td><span class="role-tag role-{{ item.role }}">{{ item.role|upper }}</span></td>
+            <td>{{ item.login_at.strftime('%Y-%m-%d %H:%M:%S') if item.login_at else 'Unknown' }}</td>
+            <td>{{ item.last_seen_at.strftime('%Y-%m-%d %H:%M:%S') if item.last_seen_at else 'Unknown' }}</td>
+            <td>{{ item.logout_at.strftime('%Y-%m-%d %H:%M:%S') if item.logout_at else '—' }}</td>
+            <td><span class="badge" style="color:{% if item.status == 'active' %}#86efac{% else %}var(--text-muted){% endif %};">{{ item.status|replace('_', ' ')|upper }}</span></td>
+            <td><code>{{ item.ip_address }}</code></td>
+            <td>{{ item.login_method|title }}<br><small title="{{ item.user_agent }}" style="color:var(--text-muted);">{{ item.user_agent|truncate(45) }}</small></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" style="text-align:center; color:var(--text-muted);">No login sessions recorded yet.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table></div>
+    <p style="color:var(--text-muted); font-size:.82rem; margin-top:1rem;">“Active” means no explicit logout was recorded. Closing a browser does not send a logout event; use Last Seen to judge recent activity.</p>
+</div>
+{% endblock %}

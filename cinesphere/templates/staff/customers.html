@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Theater Patrons — Staff Portal{% endblock %}
+{% block content %}
+<div class="container">
+    <div class="section-header"><div>
+        <h1 class="section-title">Theater Patrons</h1>
+        <p style="color: var(--text-muted); margin: .35rem 0 0;">Booking-support information for {{ theater_name }} only. Account administration belongs to the system admin.</p>
+    </div></div>
+    <form action="{{ url_for('staff.customers_list') }}" method="GET" style="display:flex; gap:.8rem; margin-bottom:1.5rem; max-width:560px;">
+        <input type="text" name="search" class="form-control" placeholder="Search name, email, or booking code..." value="{{ search }}">
+        <button type="submit" class="btn btn-outline">Search</button>
+    </form>
+    <div class="table-responsive"><table class="custom-table">
+        <thead><tr><th>Customer</th><th>Email</th><th>Bookings</th><th>Tickets</th><th>Theater Spend</th><th>Last Visit</th><th>Latest Booking</th></tr></thead>
+        <tbody>
+        {% for c in customers %}
+        <tr><td><strong>{{ c.name }}</strong></td><td>{{ c.email or 'Not available' }}</td><td>{{ c.booking_count }}</td><td>{{ c.ticket_count }}</td><td>₹{{ c.theater_spend }}</td><td>{{ c.last_visit or 'N/A' }}</td><td><code>{{ c.last_booking_code }}</code></td></tr>
+        {% else %}
+        <tr><td colspan="7" style="text-align:center; color:var(--text-muted);">No patrons with bookings at this theater found.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table></div>
+</div>
+{% endblock %}

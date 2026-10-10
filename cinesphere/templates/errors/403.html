@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Access Forbidden (403) — CineSphere{% endblock %}
+
+{% block content %}
+<div class="container" style="text-align: center; padding: 6rem 1rem;">
+    <div style="font-size: 4rem; margin-bottom: 1rem;">🚫</div>
+    <h1 style="font-size: 2.5rem; font-family: var(--font-heading); margin-bottom: 0.5rem; color: var(--danger);">403 — Access Forbidden</h1>
+    <p style="color: var(--text-muted); font-size: 1.1rem; max-width: 500px; margin: 0 auto 2rem;">
+        {{ message or "You do not have the role permissions required to access this resource. Please sign in with an authorized account." }}
+    </p>
+    <div style="display: flex; gap: 1rem; justify-content: center;">
+        <a href="{{ url_for('public.index') }}" class="btn btn-primary">Return Home</a>
+        <a href="{{ url_for('auth.login') }}" class="btn btn-outline">Switch Account</a>
+    </div>
+</div>
+{% endblock %}

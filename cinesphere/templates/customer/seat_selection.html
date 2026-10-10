@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+
+{% block title %}Select Seats — {{ movie.title }}{% endblock %}
+
+{% block extra_head %}
+<!-- Razorpay Checkout Standard Library -->
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div>
+            <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.3rem;">
+                <h1 style="font-size: 1.6rem; font-family: var(--font-heading); margin: 0;">{{ movie.title }}</h1>
+                <span class="chip" style="background: rgba(37,99,235,0.2); color: #93c5fd;">{{ movie.language }}</span>
+                {% if employee_benefits %}
+                <span class="badge" style="background:#15803d; color:white;">EMPLOYEE BENEFIT</span>
+                {% elif customer_tier == 'Pro' %}
+                <span class="badge" style="background: #e50914; color: white;">👑 PRO MEMBER: 20% OFF</span>
+                {% elif customer_tier == 'Plus' %}
+                <span class="badge" style="background: #3b82f6; color: white;">⭐ PLUS MEMBER: 10% OFF</span>
+                {% else %}
+                <span class="badge" style="background: #3f3f46; color: #d4d4d8;">FREE MEMBER</span>
+                {% endif %}
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">
+                🏛 {{ theater.name }} • {{ screen.name }} ({{ screen.screen_type }}) • 📅 {{ showtime.show_date }} at <strong style="color: #fff;">{{ showtime.start_time }}</strong>
+            </p>
+        </div>
+        <div style="text-align: right;">
+            <span style="font-size: 0.85rem; color: var(--text-muted); display: block;">Base Seat Fare</span>
+            <span style="font-size: 1.4rem; font-weight: 800; color: var(--accent);">₹{{ base_price }}</span>
+        </div>
+    </div>
+
+    <!-- Seat Legend -->
+    <div style="display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; margin-bottom: 2rem; font-size: 0.85rem;">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <div class="seat available" style="width: 24px; height: 22px;"></div> Available
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <div class="seat selected" style="width: 24px; height: 22px;"></div> Selected
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <div class="seat booked" style="width: 24px; height: 22px;"></div> Booked
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <div class="seat available type-vip" style="width: 24px; height: 22px;"></div> VIP Recliner
+        </div>
+    </div>
+
+    <!-- Screen Graphic -->
+    <div class="screen-visual">
+        <span class="screen-visual-label">ALL EYES THIS WAY (AUDITORIUM SCREEN)</span>
+    </div>
+
+    <!-- Seat Matrix -->
+    <div class="seat-map-wrapper">
+        {% for row in seat_layout %}
+        <div class="seat-row">
+            <span class="row-label">{{ row.row_name }}</span>
+            {% for s in row.seats %}
+            <div class="seat {{ s.status }} {% if s.type == 'VIP' %}type-vip{% endif %}"
+                 data-seat="{{ s.seat_number }}"
+                 data-type="{{ s.type }}"
+                 onclick="toggleSeat(this)">
+                {{ s.seat_number }}
+            </div>
+            {% endfor %}
+            <span class="row-label">{{ row.row_name }}</span>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Checkout Bar with Razorpay Integration -->
+    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.8rem; margin-top: 2.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1.5rem;">
+        <div>
+            <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.2rem;">Selected Seats:</div>
+            <div id="selected-seats-display" style="font-size: 1.2rem; font-weight: 700; color: #fff;">None</div>
+        </div>
+
+        <div>
+            <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.2rem;">
+                Estimated Amount {% if customer_tier != 'Free' %}<span style="color: #22c55e;">({{ customer_tier }} Discount Applied)</span>{% endif %}:
+            </div>
+            <div id="estimated-total-display" style="font-size: 1.6rem; font-weight: 800; color: var(--accent);">₹0</div>
+        </div>
+
+        <form id="checkout-form" action="{{ url_for('booking.checkout', showtime_id=showtime._id) }}" method="POST" style="display: flex; align-items: center; gap: 1rem; flex-wrap:wrap;">
+            <input type="hidden" name="selected_seats" id="selected-seats-input">
+            <input type="hidden" name="payment_method" value="Razorpay Online">
+            <input type="hidden" name="razorpay_order_id" id="razorpay-order-id">
+            <input type="hidden" name="razorpay_payment_id" id="razorpay-payment-id">
+            <input type="hidden" name="razorpay_signature" id="razorpay-signature">
+            {% if employee_benefits %}
+            <select name="benefit_type" id="benefit-type" class="form-control" style="width:auto;" onchange="updateSummary()">
+                <option value="free_pass">Free pass ({{ employee_benefits.free_remaining }} left)</option>
+                <option value="family_discount">Family 25% off ({{ employee_benefits.family_remaining }} left)</option>
+            </select>
+            {% endif %}
+            
+            {% if session.get('user_id') %}
+            <button type="submit" id="btn-pay" class="btn btn-primary" style="padding: 0.75rem 1.8rem; font-size: 1rem;" disabled>
+                {% if employee_benefits %}Apply employee benefit{% elif payment_configured %}Pay securely{% else %}Complete demo booking{% endif %}
+            </button>
+            {% if not payment_configured %}<span class="payment-status-note">Demo mode: no money is charged. Add Razorpay keys to enable live checkout.</span>{% endif %}
+            {% else %}
+            <a href="{{ url_for('auth.login', next=request.url) }}" class="btn btn-primary">
+                Sign In to Reserve Seats
+            </a>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+<script>
+const basePrice = {{ base_price }};
+const customerTier = "{{ customer_tier }}";
+const razorpayKeyId = "{{ razorpay_key_id }}";
+const paymentConfigured = {{ 'true' if payment_configured else 'false' }};
+const showtimeId = "{{ showtime._id }}";
+const employeeBenefits = {{ employee_benefits|tojson if employee_benefits else 'null' }};
+let selectedSeats = [];
+
+function toggleSeat(elem) {
+    if (elem.classList.contains('booked')) return;
+    
+    const seatId = elem.getAttribute('data-seat');
+    const seatType = elem.getAttribute('data-type');
+    
+    if (elem.classList.contains('selected')) {
+        elem.classList.remove('selected');
+        selectedSeats = selectedSeats.filter(s => s.id !== seatId);
+    } else {
+        elem.classList.add('selected');
+        selectedSeats.push({ id: seatId, type: seatType });
+    }
+    
+    updateSummary();
+}
+
+function updateSummary() {
+    const display = document.getElementById('selected-seats-display');
+    const totalDisplay = document.getElementById('estimated-total-display');
+    const input = document.getElementById('selected-seats-input');
+    const payBtn = document.getElementById('btn-pay');
+    
+    if (selectedSeats.length === 0) {
+        display.innerText = 'None';
+        totalDisplay.innerText = '₹0';
+        input.value = '';
+        if (payBtn) payBtn.disabled = true;
+        return;
+    }
+    
+    display.innerText = selectedSeats.map(s => s.id).join(', ');
+    input.value = selectedSeats.map(s => s.id).join(',');
+    
+    let subtotal = 0;
+    selectedSeats.forEach(s => {
+        let mult = 1.0;
+        if (s.type === 'Premium') mult = 1.4;
+        if (s.type === 'VIP') mult = 2.0;
+        subtotal += Math.round(basePrice * mult);
+    });
+    
+    const fee = 35 * selectedSeats.length;
+    const gst = Math.round((subtotal + fee) * 0.18);
+    let grandTotal = subtotal + fee + gst;
+
+    if (employeeBenefits) {
+        const benefitType = document.getElementById('benefit-type').value;
+        const remaining = benefitType === 'free_pass' ? employeeBenefits.free_remaining : employeeBenefits.family_remaining;
+        if (benefitType === 'free_pass') grandTotal = 0;
+        else grandTotal = Math.max(0, grandTotal - Math.round(subtotal * 0.25));
+        totalDisplay.innerText = '₹' + grandTotal + ` (${remaining} eligible ticket(s) left)`;
+        if (payBtn) payBtn.disabled = selectedSeats.length > remaining;
+        return;
+    }
+
+    // Membership Tier Discount
+    let discountPct = 0;
+    if (customerTier === 'Pro') discountPct = 0.20;
+    else if (customerTier === 'Plus') discountPct = 0.10;
+
+    const discountAmount = Math.round(subtotal * discountPct);
+    grandTotal = Math.max(1, grandTotal - discountAmount);
+    
+    totalDisplay.innerText = '₹' + grandTotal + (discountAmount > 0 ? ` (Saved ₹${discountAmount})` : '');
+    if (payBtn) payBtn.disabled = false;
+}
+
+// Create an order on the server and book only after a signed payment callback.
+document.getElementById('checkout-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const payBtn = document.getElementById('btn-pay');
+    if (employeeBenefits) {
+        payBtn.disabled = true;
+        payBtn.innerText = 'Applying benefit...';
+        try {
+            const response = await fetch("{{ url_for('booking.book_employee_benefit', showtime_id=showtime._id) }}", {method: 'POST', body: new FormData(this)});
+            const result = await response.json();
+            if (!response.ok || !result.success) throw new Error(result.error || 'Benefit booking failed.');
+            window.location.href = result.redirect_url;
+        } catch (err) {
+            alert(err.message);
+            resetPaymentButton();
+        }
+        return;
+    }
+    if (!paymentConfigured) {
+        payBtn.disabled = true;
+        payBtn.innerText = 'Completing demo booking...';
+        try {
+            const demoData = new FormData(this);
+            const response = await fetch("{{ url_for('booking.book_direct', showtime_id=showtime._id) }}", {method: 'POST', body: demoData});
+            const result = await response.json();
+            if (!response.ok || !result.success) throw new Error(result.error || 'Demo booking failed.');
+            window.location.href = result.redirect_url;
+        } catch (err) {
+            alert(err.message || 'Demo booking could not be completed.');
+            resetPaymentButton();
+        }
+        return;
+    }
+    if (!window.Razorpay) {
+        alert('The payment provider could not load. Check your internet connection and try again.');
+        return;
+    }
+    payBtn.disabled = true;
+    payBtn.innerText = 'Preparing payment...';
+
+    try {
+        const response = await fetch("{{ url_for('booking.create_razorpay_order', showtime_id=showtime._id) }}", {
+            method: "POST",
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({selected_seats: document.getElementById('selected-seats-input').value})
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.error || 'Unable to create payment order.');
+
+        const checkoutForm = this;
+        const payment = new Razorpay({
+            key: result.key_id,
+            amount: result.order.amount,
+            currency: result.currency,
+            name: 'CineSphere',
+            description: selectedSeats.map(s => s.id).join(', '),
+            order_id: result.order.id,
+            theme: {color: '#ff3b5c'},
+            handler: function(response) {
+                document.getElementById('razorpay-order-id').value = response.razorpay_order_id;
+                document.getElementById('razorpay-payment-id').value = response.razorpay_payment_id;
+                document.getElementById('razorpay-signature').value = response.razorpay_signature;
+                checkoutForm.submit();
+            },
+            modal: {ondismiss: resetPaymentButton}
+        });
+        payment.on('payment.failed', function(response) {
+            alert(response.error.description || 'Payment failed. No booking was created.');
+            resetPaymentButton();
+        });
+        payment.open();
+    } catch (err) {
+        alert(err.message || 'Payment could not be started.');
+        resetPaymentButton();
+    }
+});
+
+function resetPaymentButton() {
+    const payBtn = document.getElementById('btn-pay');
+    payBtn.disabled = selectedSeats.length === 0;
+    payBtn.innerText = employeeBenefits ? 'Apply employee benefit' : (paymentConfigured ? 'Pay securely' : 'Complete demo booking');
+}
+
+</script>
+{% endblock %}

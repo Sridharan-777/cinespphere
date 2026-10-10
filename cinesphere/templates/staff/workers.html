@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}Field Workers — Staff Portal{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="section-header">
+        <div>
+            <h1 class="section-title">Field Worker Management</h1>
+            <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.3rem;">
+                Theater Capacity Policy: <strong>Exactly 20 Field Workers maximum</strong> per location.
+            </p>
+        </div>
+        <div>
+            {% if worker_count < max_workers %}
+            <a href="{{ url_for('staff.worker_create') }}" class="btn btn-primary">+ Add Worker ({{ worker_count }}/{{ max_workers }})</a>
+            {% else %}
+            <span class="badge" style="background: rgba(239, 68, 68, 0.2); color: #fca5a5; font-size: 0.9rem; padding: 0.5rem 1rem;">
+                Max Capacity Reached (20/20)
+            </span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Capacity Bar Card -->
+    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 1.2rem; margin-bottom: 2rem;">
+        <div style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 0.5rem;">
+            <span>Field Worker Roster Limit</span>
+            <strong>{{ worker_count }} / 20 Assigned</strong>
+        </div>
+        <div style="height: 10px; background: var(--bg-secondary); border-radius: 5px; overflow: hidden;">
+            <div style="height: 100%; width: {{ (worker_count / 20) * 100 }}%; background: {% if worker_count == 20 %}var(--danger){% else %}var(--accent){% endif %}; transition: width 0.3s ease;"></div>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Emp Code</th>
+                    <th>Worker Name</th>
+                    <th>Department</th>
+                    <th>Designation</th>
+                    <th>Contact</th>
+                    <th>Current Task</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for w in workers %}
+                <tr>
+                    <td><code>{{ w.employee_code }}</code></td>
+                    <td><strong>{{ w.name }}</strong></td>
+                    <td>{{ w.department }}</td>
+                    <td>{{ w.designation }}</td>
+                    <td>{{ w.phone or w.email }}</td>
+                    <td><span style="color: #60a5fa;">{{ w.current_task or 'Idle' }}</span></td>
+                    <td>
+                        <span class="badge" style="background: {% if w.status == 'active' %}rgba(34, 197, 94, 0.2); color: #86efac;{% else %}rgba(239, 68, 68, 0.2); color: #fca5a5;{% endif %}">
+                            {{ w.status|upper }}
+                        </span>
+                    </td>
+                    <td>
+                        <form action="{{ url_for('staff.worker_toggle_status', worker_id=w._id) }}" method="POST">
+                            <button type="submit" class="btn btn-sm {% if w.status == 'active' %}btn-danger{% else %}btn-success{% endif %}">
+                                {% if w.status == 'active' %}Deactivate{% else %}Activate{% endif %}
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="8" style="text-align: center; color: var(--text-muted);">No field workers assigned to this theater yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

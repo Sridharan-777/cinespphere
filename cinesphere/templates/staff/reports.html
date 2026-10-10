@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}Theater Analytics & Financial Intelligence — Staff Portal{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="section-header">
+        <div>
+            <h1 class="section-title">Theater Analytics & Box Office Intelligence</h1>
+            <p style="color: var(--text-muted); font-size: 0.92rem; margin-top: 0.3rem;">
+                Real-time occupancy rates, revenue metrics, average ticket yield, and operational throughput for <strong>{{ theater.name }}</strong>.
+            </p>
+        </div>
+    </div>
+
+    <!-- Core Analytics Cards -->
+    <div class="dashboard-grid">
+        <div class="stat-card" style="border-top: 3px solid var(--success);">
+            <div class="stat-title">Today's Box Office Gross</div>
+            <div class="stat-value" style="color: var(--success);">₹{{ stats.today_revenue }}</div>
+            <span style="font-size: 0.82rem; color: var(--text-muted);">{{ stats.today_bookings }} tickets processed today</span>
+        </div>
+
+        <div class="stat-card" style="border-top: 3px solid var(--accent);">
+            <div class="stat-title">Lifetime Theater Revenue</div>
+            <div class="stat-value" style="color: var(--accent);">₹{{ stats.total_revenue }}</div>
+            <span style="font-size: 0.82rem; color: var(--text-muted);">Across {{ stats.total_bookings }} total reservations</span>
+        </div>
+
+        <div class="stat-card" style="border-top: 3px solid #3b82f6;">
+            <div class="stat-title">Average Ticket Realization (ATV)</div>
+            <div class="stat-value" style="color: #60a5fa;">₹{{ stats.avg_ticket_value }}</div>
+            <span style="font-size: 0.82rem; color: var(--text-muted);">Net revenue per customer transaction</span>
+        </div>
+
+        <div class="stat-card" style="border-top: 3px solid #8b5cf6;">
+            <div class="stat-title">Auditorium Occupancy Rate</div>
+            <div class="stat-value" style="color: #c084fc;">{{ stats.occupancy_rate }}%</div>
+            <span style="font-size: 0.82rem; color: var(--text-muted);">Seats booked vs total screen capacity</span>
+        </div>
+    </div>
+
+    <!-- Secondary Operational Statistics -->
+    <div class="dashboard-grid" style="margin-top: 1rem;">
+        <div class="stat-card">
+            <div class="stat-title">Screen Utilization</div>
+            <div class="stat-value" style="font-size: 1.6rem; color: #fff;">{{ stats.screens_count }} Screens Active</div>
+            <div style="height: 6px; background: var(--bg-secondary); border-radius: 3px; margin-top: 0.8rem; overflow: hidden;">
+                <div style="width: 100%; height: 100%; background: #22c55e;"></div>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-title">Staff On Duty</div>
+            <div class="stat-value" style="font-size: 1.6rem; color: #60a5fa;">{{ stats.staff_count }} / 5 Allocated</div>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Strict theater capacity respected</span>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-title">Field Worker Force</div>
+            <div class="stat-value" style="font-size: 1.6rem; color: #fcd34d;">{{ stats.worker_count }} / 20 Allocated</div>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Cleaners, audio techs, ushers</span>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-title">Pending Maintenance Tasks</div>
+            <div class="stat-value" style="font-size: 1.6rem; color: {% if stats.pending_tasks > 0 %}var(--warning){% else %}var(--success){% endif %};">
+                {{ stats.pending_tasks }} Active
+            </div>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Operational maintenance queue</span>
+        </div>
+    </div>
+
+    <!-- Historical Bookings Registry with Razorpay transaction stamps -->
+    <div class="section-header" style="margin-top: 2.5rem;">
+        <h2 class="section-title">Verified Ticket Transactions & Gateway Audit</h2>
+    </div>
+
+    <div class="table-responsive">
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Booking Code</th>
+                    <th>Movie Title</th>
+                    <th>Auditorium</th>
+                    <th>Reserved Seats</th>
+                    <th>Subtotal</th>
+                    <th>GST & Taxes</th>
+                    <th>Net Amount</th>
+                    <th>Payment Method</th>
+                    <th>Gateway Ref</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for b in bookings %}
+                <tr>
+                    <td><code>{{ b.booking_code }}</code></td>
+                    <td><strong>{{ b.movie_title }}</strong></td>
+                    <td>{{ b.screen_name }}</td>
+                    <td><strong style="color: var(--accent);">{{ b.seats|join(', ') }}</strong></td>
+                    <td>₹{{ b.pricing.subtotal }}</td>
+                    <td>₹{{ b.pricing.gst }}</td>
+                    <td><strong style="color: var(--success); font-size: 1rem;">₹{{ b.pricing.grand_total }}</strong></td>
+                    <td>{{ b.payment_method }}</td>
+                    <td><small style="color: var(--text-muted);">{{ b.razorpay_payment_id or b.transaction_id or 'Auto-captured' }}</small></td>
+                    <td>
+                        <span class="badge" style="background: rgba(34, 197, 94, 0.2); color: #86efac;">
+                            {{ b.status }}
+                        </span>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="10" style="text-align: center; color: var(--text-muted);">No booking transactions registered yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

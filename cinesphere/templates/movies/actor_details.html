@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}{{ actor.name }} — CineSphere Cast Details{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="details-hero">
+        <div>
+            <img src="{{ profile_img }}" alt="{{ actor.name }}" class="details-poster">
+        </div>
+        <div class="details-info">
+            <h1>{{ actor.name }}</h1>
+            <div class="details-chips">
+                <span class="chip">🎂 Born: {{ actor.birthday or 'N/A' }}</span>
+                <span class="chip">📍 Birthplace: {{ actor.place_of_birth or 'N/A' }}</span>
+                <span class="chip">⭐ Popularity: {{ actor.popularity }}</span>
+            </div>
+
+            <h3 style="margin: 1.5rem 0 0.5rem; font-size: 1.1rem;">Biography</h3>
+            <p style="color: #d1d1d6; line-height: 1.6; font-size: 0.95rem;">
+                {{ actor.biography or 'Biography details are synchronized through TMDB Person API.' }}
+            </p>
+
+            <h3 style="margin: 2rem 0 0.8rem; font-size: 1.1rem;">Notable Filmography</h3>
+            <div class="movie-grid" style="grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 1rem;">
+                {% for movie in known_movies %}
+                <div class="movie-card">
+                    <div class="movie-card-poster-wrap">
+                        <img src="https://image.tmdb.org/t/p/w300{{ movie.poster_path }}" alt="{{ movie.title }}" class="movie-card-poster" onerror="this.src='/static/images/default_poster.svg'">
+                    </div>
+                    <div class="movie-card-body" style="padding: 0.6rem;">
+                        <h4 style="font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ movie.title }}</h4>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">{{ movie.character }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

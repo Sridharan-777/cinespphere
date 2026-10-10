@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}{{ theater.name }} — Admin View{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="details-hero" style="display:block; margin-bottom:2rem;">
+        <h1 style="font-size: 2.2rem; font-family: var(--font-heading); margin-bottom: 0.3rem;">{{ theater.name }}</h1>
+        <p style="color: var(--text-muted); font-size: 0.95rem;">{{ theater.address }}, {{ theater.city }}</p>
+    </div>
+
+    <div class="form-card" style="max-width:none; margin:0 0 2rem;">
+        <h2 style="margin-bottom:1.25rem;">Edit theater</h2>
+        <form action="{{ url_for('admin.edit_theater', theater_id=theater._id) }}" method="POST">
+            <div class="crud-form-grid">
+                <div class="form-group"><label class="form-label">Name</label><input class="form-control" name="name" value="{{ theater.name }}" required></div>
+                <div class="form-group"><label class="form-label">City</label><input class="form-control" name="city" value="{{ theater.city }}" required></div>
+                <div class="form-group"><label class="form-label">Address</label><input class="form-control" name="address" value="{{ theater.address }}" required></div>
+                <div class="form-group"><label class="form-label">Phone</label><input class="form-control" name="phone" value="{{ theater.phone or '' }}"></div>
+                <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-control" name="email" value="{{ theater.email or '' }}"></div>
+            </div>
+            <button class="btn btn-primary" type="submit">Save changes</button>
+        </form>
+        <form action="{{ url_for('admin.delete_theater', theater_id=theater._id) }}" method="POST" style="margin-top:1rem;" onsubmit="return confirm('Delete this empty theater and its screens? This cannot be undone.');">
+            <button class="btn btn-danger" type="submit">Delete empty theater</button>
+        </form>
+    </div>
+
+    <!-- Capacity Counters -->
+    <div class="dashboard-grid">
+        <div class="stat-card">
+            <div class="stat-title">Staff Members (Capacity 5)</div>
+            <div class="stat-value" style="color: #60a5fa;">{{ staff_members|length }} / 5</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-title">Field Workers (Capacity 20)</div>
+            <div class="stat-value" style="color: #fcd34d;">{{ workers|length }} / 20</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-title">Auditorium Screens</div>
+            <div class="stat-value">{{ screens|length }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-title">Theater Revenue</div>
+            <div class="stat-value" style="color: var(--success);">₹{{ stats.total_revenue }}</div>
+        </div>
+    </div>
+
+    <!-- Staff Roster -->
+    <div class="section-header" style="margin-top: 2rem;">
+        <h2 class="section-title">Assigned Theater Staff ({{ staff_members|length }}/5)</h2>
+    </div>
+
+    <div class="table-responsive">
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Emp Code</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Designation</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in staff_members %}
+                <tr>
+                    <td><code>{{ s.employee_code }}</code></td>
+                    <td><strong>{{ s.name }}</strong></td>
+                    <td>{{ s.email }}</td>
+                    <td>{{ s.designation }}</td>
+                    <td><span class="badge" style="background: rgba(34, 197, 94, 0.2); color: #86efac;">{{ s.status }}</span></td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">No staff members assigned to this location yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Field Worker Roster -->
+    <div class="section-header" style="margin-top: 2rem;">
+        <h2 class="section-title">Field Workers Roster ({{ workers|length }}/20)</h2>
+    </div>
+
+    <div class="table-responsive">
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Emp Code</th>
+                    <th>Worker Name</th>
+                    <th>Department</th>
+                    <th>Designation</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for w in workers %}
+                <tr>
+                    <td><code>{{ w.employee_code }}</code></td>
+                    <td><strong>{{ w.name }}</strong></td>
+                    <td>{{ w.department }}</td>
+                    <td>{{ w.designation }}</td>
+                    <td><span class="badge" style="background: rgba(34, 197, 94, 0.2); color: #86efac;">{{ w.status }}</span></td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">No field workers assigned yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

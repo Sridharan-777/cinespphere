@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Operational Tasks — Staff Portal{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="section-header">
+        <h1 class="section-title">Field Worker Operations & Maintenance Tasks</h1>
+    </div>
+
+    <!-- Create Task Form Card -->
+    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.8rem; margin-bottom: 2.5rem;">
+        <h3 style="font-size: 1.2rem; margin-bottom: 0.5rem;">Assign Operational Duty</h3>
+        <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 1.5rem;">Dispatch cinema cleaning, projector testing, seat sanitization, and lobby duties.</p>
+
+        <form action="{{ url_for('staff.tasks') }}" method="POST">
+            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">Task Title</label>
+                    <input type="text" name="title" class="form-control" placeholder="e.g. Deep clean Screen 2 post-show" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Assign to Field Worker</label>
+                    <select name="worker_id" class="form-control" required>
+                        {% for w in workers %}
+                        <option value="{{ w._id }}">{{ w.name }} ({{ w.department }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Priority</label>
+                    <select name="priority" class="form-control">
+                        <option value="Low">Low</option>
+                        <option value="Medium" selected>Medium</option>
+                        <option value="High">High</option>
+                        <option value="Critical">Critical</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Task Instructions / Description</label>
+                <textarea name="description" class="form-control" rows="2" placeholder="Inspect cup holders, sweep aisles, check audio subwoofer levels..." required></textarea>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Dispatch Task</button>
+        </form>
+    </div>
+
+    <!-- Active & Completed Tasks List -->
+    <div class="table-responsive">
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Task Name</th>
+                    <th>Assigned Worker</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                    <th>Dispatched By</th>
+                    <th>Notes / Evidence</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in tasks %}
+                <tr>
+                    <td>
+                        <strong>{{ t.title }}</strong><br>
+                        <small style="color: var(--text-muted);">{{ t.description }}</small>
+                    </td>
+                    <td>{{ t.worker_name }}</td>
+                    <td>
+                        <span class="badge" style="background: {% if t.priority == 'Critical' %}rgba(239, 68, 68, 0.2); color: #fca5a5;{% elif t.priority == 'High' %}rgba(245, 158, 11, 0.2); color: #fcd34d;{% else %}rgba(59, 130, 246, 0.2); color: #93c5fd;{% endif %}">
+                            {{ t.priority }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge" style="background: {% if t.status == 'Completed' %}rgba(34, 197, 94, 0.2); color: #86efac;{% elif t.status == 'In Progress' %}rgba(37, 99, 235, 0.2); color: #93c5fd;{% else %}rgba(107, 114, 128, 0.2); color: #d1d5db;{% endif %}">
+                            {{ t.status }}
+                        </span>
+                    </td>
+                    <td>{{ t.created_by }}</td>
+                    <td><small style="color: #d1d1d6;">{{ t.notes or 'No notes logged yet' }}</small></td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No operational tasks active.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

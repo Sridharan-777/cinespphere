@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}My Reviews — CineSphere{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="section-header">
+        <h1 class="section-title">My Movie Reviews & Ratings</h1>
+    </div>
+
+    <!-- Review Form Card -->
+    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.8rem; margin-bottom: 2.5rem;">
+        <h3 style="font-size: 1.2rem; margin-bottom: 0.5rem;">Submit or Update a Movie Review</h3>
+        <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 1.2rem;">Share your honest opinions. Verified badges are awarded if you have watched the film via CineSphere.</p>
+
+        <form action="{{ url_for('customer.my_reviews') }}" method="POST">
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">Select Movie</label>
+                    <select name="movie_id" class="form-control" required>
+                        <!-- Populated by available movies -->
+                        {% for r in reviews %}
+                            {% if r.movie %}
+                            <option value="{{ r.movie._id }}">{{ r.movie.title }}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Rating (Stars)</label>
+                    <select name="rating" class="form-control">
+                        <option value="5">⭐⭐⭐⭐⭐ (5 Stars)</option>
+                        <option value="4">⭐⭐⭐⭐ (4 Stars)</option>
+                        <option value="3">⭐⭐⭐ (3 Stars)</option>
+                        <option value="2">⭐⭐ (2 Stars)</option>
+                        <option value="1">⭐ (1 Star)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Review Headline</label>
+                <input type="text" name="title" class="form-control" placeholder="e.g. Masterpiece visuals and stellar sound!" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Detailed Comments</label>
+                <textarea name="comment" class="form-control" rows="3" placeholder="What stood out to you? Acting, directing, pacing, cinematography..." required></textarea>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Post Review</button>
+        </form>
+    </div>
+
+    <!-- List of previous reviews -->
+    {% if reviews %}
+    <div style="display: flex; flex-direction: column; gap: 1rem;">
+        {% for r in reviews %}
+        <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 1.4rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+                <h3 style="font-size: 1.1rem; color: #fff;">{{ r.movie.title if r.movie else 'Movie' }}</h3>
+                <span style="color: var(--accent); font-weight: 700;">{{ '★' * r.rating }}{{ '☆' * (5 - r.rating) }}</span>
+            </div>
+            <div style="font-weight: 700; font-size: 0.95rem; margin-bottom: 0.3rem;">{{ r.title }}</div>
+            <p style="color: #d1d1d6; font-size: 0.9rem; line-height: 1.5;">{{ r.comment }}</p>
+            <div style="display: flex; gap: 1rem; align-items: center; margin-top: 0.8rem; font-size: 0.8rem; color: var(--text-muted);">
+                <span>Date: {{ r.created_at.strftime('%d %b %Y') if r.created_at else '' }}</span>
+                {% if r.is_verified %}
+                <span class="badge" style="background: rgba(34, 197, 94, 0.2); color: #86efac;">✓ Verified Booking</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p style="text-align: center; color: var(--text-muted); padding: 3rem; background: var(--bg-card); border-radius: 10px;">You haven't reviewed any movies yet.</p>
+    {% endif %}
+</div>
+{% endblock %}

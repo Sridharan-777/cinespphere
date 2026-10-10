@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Movies — Admin Console{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="section-header">
+        <div>
+            <h1 class="section-title">Movie Catalog & TMDB Sync</h1>
+            <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.3rem;">
+                All movies, posters, backdrops, actors, and trailers are directly synced from The Movie Database (TMDB).
+            </p>
+        </div>
+        <form action="{{ url_for('admin.sync_tmdb_movies') }}" method="POST">
+            <button type="submit" class="btn btn-accent">⚡ Trigger Live TMDB Sync</button>
+        </form>
+    </div>
+
+    <div class="table-responsive">
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Poster</th>
+                    <th>Title & TMDB ID</th>
+                    <th>Rating</th>
+                    <th>Runtime</th>
+                    <th>Director</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in movies %}
+                <tr>
+                    <td>
+                        <img src="{{ m.poster_url }}" alt="Poster" style="width: 45px; height: 68px; object-fit: cover; border-radius: 4px;">
+                    </td>
+                    <td>
+                        <strong>{{ m.title }}</strong><br>
+                        <small style="color: var(--text-muted);">TMDB: {{ m.tmdb_id }} • {{ m.release_date }}</small>
+                    </td>
+                    <td><span style="color: var(--accent); font-weight: 700;">⭐ {{ m.rating }}</span></td>
+                    <td>{{ m.runtime }}m</td>
+                    <td>{{ m.director }}</td>
+                    <td><span class="badge" style="background: rgba(34, 197, 94, 0.2); color: #86efac;">{{ m.status }}</span></td>
+                    <td>
+                        <a href="{{ url_for('movies.movie_details', movie_id=m._id) }}" class="btn btn-sm btn-outline">View Page</a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">No movies synchronized yet. Click "Trigger Live TMDB Sync".</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}Digital Ticket — {{ booking.booking_code }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 650px; padding: 2rem 1rem;">
+    <!-- Digital Cinema Boarding Pass -->
+    <div style="background: #11111b; border: 2px solid var(--border); border-radius: 16px; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.6);">
+        <!-- Ticket Header Banner -->
+        <div style="background: linear-gradient(135deg, var(--primary), #1e1b4b); padding: 1.5rem 2rem; color: #fff; display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 0.8rem;">
+                <img src="/static/images/logo.svg" alt="Logo" style="width: 36px; height: 36px;">
+                <div>
+                    <h2 style="font-size: 1.4rem; font-family: var(--font-heading); margin: 0;">CineSphere Virtual Pass</h2>
+                    <span style="font-size: 0.78rem; opacity: 0.85;">Official Gate E-Ticket</span>
+                </div>
+            </div>
+            <div style="text-align: right;">
+                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; display: block;">Booking Code</span>
+                <span style="font-size: 1.3rem; font-weight: 800; font-family: monospace;">{{ booking.booking_code }}</span>
+            </div>
+        </div>
+
+        <!-- Ticket Body -->
+        <div style="padding: 2rem;">
+            <div style="margin-bottom: 1.5rem;">
+                <span style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">Movie Presentation</span>
+                <h1 style="font-size: 1.9rem; font-family: var(--font-heading); margin: 0.2rem 0; color: #fff;">{{ booking.movie_title }}</h1>
+            </div>
+
+            <!-- Grid Details -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; margin-bottom: 2rem; font-size: 0.95rem;">
+                <div>
+                    <span style="font-size: 0.78rem; color: var(--text-muted); display: block;">Theater Location</span>
+                    <strong>{{ booking.theater_name }}</strong>
+                </div>
+                <div>
+                    <span style="font-size: 0.78rem; color: var(--text-muted); display: block;">Auditorium & Screen</span>
+                    <strong>{{ booking.screen_name }}</strong>
+                </div>
+                <div>
+                    <span style="font-size: 0.78rem; color: var(--text-muted); display: block;">Show Date & Time</span>
+                    <strong>{{ booking.show_date }} • {{ booking.show_time }}</strong>
+                </div>
+                <div>
+                    <span style="font-size: 0.78rem; color: var(--text-muted); display: block;">Allocated Seats</span>
+                    <strong style="color: var(--accent); font-size: 1.15rem;">{{ booking.seats|join(', ') }}</strong>
+                </div>
+                <div>
+                    <span style="font-size: 0.78rem; color: var(--text-muted); display: block;">Payment Gateway</span>
+                    <span style="color: #22c55e; font-weight: 700;">✓ Razorpay Confirmed</span>
+                </div>
+                <div>
+                    <span style="font-size: 0.78rem; color: var(--text-muted); display: block;">Total Paid</span>
+                    <strong style="color: #22c55e;">₹{{ booking.pricing.grand_total }}</strong>
+                </div>
+            </div>
+
+            <!-- Perforated Tear Line -->
+            <div style="position: relative; margin: 1.5rem -2rem; border-top: 2px dashed #27273a;">
+                <div style="position: absolute; left: -14px; top: -14px; width: 28px; height: 28px; background: var(--bg-dark); border-radius: 50%;"></div>
+                <div style="position: absolute; right: -14px; top: -14px; width: 28px; height: 28px; background: var(--bg-dark); border-radius: 50%;"></div>
+            </div>
+
+            <!-- QR Code Verification Block -->
+            <div style="display: flex; align-items: center; justify-content: space-between; padding-top: 1rem;">
+                <div>
+                    <div style="font-size: 0.85rem; font-weight: 700; color: #fff;">Fast-Track Usher Scanner</div>
+                    <p style="font-size: 0.78rem; color: var(--text-muted); max-width: 280px; margin: 0.2rem 0 0.8rem;">
+                        Present this barcode or QR code at cinema gate. No physical paper printing required.
+                    </p>
+                    <small style="color: #71717a; font-family: monospace;">Ref: {{ booking.razorpay_payment_id or booking.transaction_id or 'CS-RZP-2026' }}</small>
+                </div>
+                <div style="background: #fff; padding: 10px; border-radius: 10px; text-align: center;">
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=110x110&data={{ booking.booking_code }}|{{ booking.movie_title }}|{{ booking.seats|join(',') }}" alt="Ticket QR" style="width: 105px; height: 105px; display: block;">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div style="display: flex; gap: 1rem; margin-top: 1.5rem; justify-content: center;">
+        <button onclick="window.print()" class="btn btn-outline" style="flex: 1;">🖨 Print / Save as PDF</button>
+        <a href="{{ url_for('customer.my_bookings') }}" class="btn btn-primary" style="flex: 1;">My Bookings</a>
+    </div>
+</div>
+{% endblock %}

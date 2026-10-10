@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}Worker Dashboard — CineSphere{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 2rem; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div>
+            <span class="chip" style="background: #d97706; color: #fff; margin-bottom: 0.5rem; display: inline-block;">FIELD WORKER PORTAL</span>
+            <h1 style="font-size: 2rem; font-family: var(--font-heading); margin: 0.2rem 0;">{{ worker.name }} ({{ worker.employee_code }})</h1>
+            <p style="color: var(--text-muted); font-size: 0.9rem; margin: 0;">
+                🏛 {{ worker.theater_name }} • Department: <strong>{{ worker.department }}</strong> • Designation: <strong>{{ worker.designation }}</strong>
+            </p>
+        </div>
+        <div style="display: flex; gap: 0.8rem;">
+            <a href="{{ url_for('worker.attendance') }}" class="btn btn-primary">
+                📋 Shift Attendance ({% if attendance %}Checked In{% else %}Not Marked{% endif %})
+            </a>
+        </div>
+    </div>
+
+    <div style="background: var(--bg-card); border: 1px solid var(--border); border-left: 5px solid #22c55e; border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem;">
+        <div style="display:flex; justify-content:space-between; gap:1rem; align-items:center; flex-wrap:wrap;">
+            <div>
+                <h2 style="margin:0 0 .5rem;">Employee Movie Benefits</h2>
+                <p style="color:var(--text-muted); margin:0;">For personal or family viewing—not for operational duties. Allowances reset monthly.</p>
+            </div>
+            <a href="{{ url_for('movies.movie_list') }}" class="btn btn-primary">Use Movie Benefit</a>
+        </div>
+        <div class="dashboard-grid" style="margin-top:1.25rem;">
+            <div class="stat-card">
+                <div class="stat-title">Free employee tickets remaining</div>
+                <div class="stat-value" style="color:#22c55e;">{{ benefits.free_remaining }} / 2</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title">25% family-discount tickets remaining</div>
+                <div class="stat-value" style="color:#60a5fa;">{{ benefits.family_remaining }} / 4</div>
+            </div>
+        </div>
+        <small style="color:var(--text-muted);">Active workers only. Subject to seat availability. Cancelled tickets do not consume allowance.</small>
+    </div>
+
+    <!-- Salary & Patron Footfall Analytics Section -->
+    <div class="dashboard-grid">
+        <!-- Monthly Salary Card -->
+        <div class="stat-card" style="border-top: 3px solid #22c55e;">
+            <div class="stat-title">Monthly Compensation</div>
+            <div class="stat-value" style="color: #22c55e;">₹{{ worker.monthly_salary or 22000 }}</div>
+            <div style="margin-top: 0.5rem; font-size: 0.82rem; color: var(--text-muted);">
+                Hourly Rate: <strong>₹{{ worker.hourly_rate or 137.5 }} / hr</strong><br>
+                Disbursement Account: <code>{{ worker.bank_account or 'HDFC-****-****-1024' }}</code>
+            </div>
+        </div>
+
+        <!-- Theater Footfall & Patron Attendance -->
+        <div class="stat-card" style="border-top: 3px solid #3b82f6;">
+            <div class="stat-title">Today's Theater Footfall</div>
+            <div class="stat-value" style="color: #60a5fa;">{{ patron_stats.today_patrons }} <span style="font-size: 1rem; font-weight: 500; color: var(--text-muted);">patrons</span></div>
+            <div style="margin-top: 0.5rem; font-size: 0.82rem; color: var(--text-muted);">
+                Audience booked across <strong>{{ patron_stats.active_shows }} scheduled shows</strong> today.
+            </div>
+        </div>
+
+        <!-- Total Approaching Patrons (Lifetime) -->
+        <div class="stat-card" style="border-top: 3px solid #f59e0b;">
+            <div class="stat-title">Total Approaching Customers</div>
+            <div class="stat-value" style="color: #fcd34d;">{{ patron_stats.total_patrons }} <span style="font-size: 1rem; font-weight: 500; color: var(--text-muted);">customers</span></div>
+            <div style="margin-top: 0.5rem; font-size: 0.82rem; color: var(--text-muted);">
+                Lifetime reserved seats serviced by this theater location.
+            </div>
+        </div>
+
+        <!-- Shift Schedule -->
+        <div class="stat-card" style="border-top: 3px solid #a855f7;">
+            <div class="stat-title">Assigned Shift Schedule</div>
+            <div class="stat-value" style="font-size: 1.35rem; color: #c084fc; margin-top: 0.8rem;">
+                {{ worker.shift_timings or '09:00 AM - 05:30 PM' }}
+            </div>
+            <div style="margin-top: 0.5rem; font-size: 0.82rem; color: var(--text-muted);">
+                Shift Status: <strong>{% if attendance %}Active On Duty{% else %}Awaiting Check-In{% endif %}</strong>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Tasks for this Worker -->
+    <div class="section-header" style="margin-top: 2rem;">
+        <h2 class="section-title">My Assigned Operational Duties</h2>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 1.2rem; margin-bottom: 3rem;">
+        {% for t in tasks %}
+        <div style="background: var(--bg-card); border: 1px solid var(--border); border-left: 5px solid {% if t.status == 'Completed' %}var(--success){% elif t.status == 'In Progress' %}#3b82f6{% else %}var(--warning){% endif %}; border-radius: 10px; padding: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+                <div>
+                    <h3 style="font-size: 1.2rem; margin: 0;">{{ t.title }}</h3>
+                    <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.3rem;">{{ t.description }}</p>
+                </div>
+                <div style="display: flex; gap: 0.5rem;">
+                    <span class="badge" style="background: rgba(245, 158, 11, 0.2); color: #fcd34d;">Priority: {{ t.priority }}</span>
+                    <span class="badge" style="background: rgba(59, 130, 246, 0.2); color: #93c5fd;">Status: {{ t.status }}</span>
+                </div>
+            </div>
+
+            {% if t.status != 'Completed' %}
+            <form action="{{ url_for('worker.update_task_status', task_id=t._id) }}" method="POST" style="margin-top: 1.2rem; display: flex; gap: 0.8rem; flex-wrap: wrap;">
+                <input type="text" name="notes" class="form-control" placeholder="Add progress notes or evidence description..." style="flex: 1;" value="{{ t.notes }}">
+                
+                {% if t.status == 'Pending' or t.status == 'Assigned' %}
+                <button type="submit" name="status" value="In Progress" class="btn btn-outline" style="border-color: #3b82f6; color: #93c5fd;">
+                    ▶ Start Task
+                </button>
+                {% endif %}
+
+                <button type="submit" name="status" value="Completed" class="btn btn-success">
+                    ✓ Mark Completed
+                </button>
+            </form>
+            {% else %}
+            <div style="margin-top: 0.8rem; font-size: 0.85rem; color: var(--success);">
+                ✓ Completed on {{ t.completed_at.strftime('%d %b %H:%M') if t.completed_at else 'Today' }} • Notes: {{ t.notes or 'None' }}
+            </div>
+            {% endif %}
+        </div>
+        {% else %}
+        <p style="padding: 2.5rem; background: var(--bg-card); border-radius: 10px; text-align: center; color: var(--text-muted);">
+            No tasks currently assigned. You are in idle standby mode.
+        </p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

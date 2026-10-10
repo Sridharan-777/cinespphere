@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Hero Movie Banner -->
+{% if featured_movie %}
+<section class="hero-backdrop" style="background-image: url('{{ featured_movie.backdrop_url }}');">
+    <div class="hero-overlay"></div>
+    <div class="hero-content">
+        <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.8rem;">
+            <span class="chip" style="background: var(--primary); color: white; display: inline-block;">🔥 BLOCKBUSTER SHOWCASE</span>
+            {% if featured_movie.is_south_indian %}
+            <span class="chip" style="background: #f59e0b; color: #000; font-weight: 700; display: inline-block;">🌟 SOUTH INDIAN CINEMA ({{ featured_movie.language }})</span>
+            {% else %}
+            <span class="chip" style="background: #3b82f6; color: white; display: inline-block;">{{ featured_movie.language }}</span>
+            {% endif %}
+        </div>
+
+        <h1 class="hero-title">{{ featured_movie.title }}</h1>
+        <div class="hero-meta">
+            <span>⭐ {{ featured_movie.rating }} / 10</span>
+            <span>•</span>
+            <span>{{ featured_movie.runtime }} mins</span>
+            <span>•</span>
+            <span>{{ featured_movie.genres|join(', ') }}</span>
+            <span>•</span>
+            <span>Director: {{ featured_movie.director }}</span>
+        </div>
+        <p class="hero-desc">{{ featured_movie.overview[:220] }}...</p>
+        <div class="hero-actions">
+            <a href="{{ url_for('movies.movie_details', movie_id=featured_movie._id) }}" class="btn btn-primary" style="padding: 0.75rem 1.8rem; font-size: 1rem;">🎟 Book Tickets</a>
+            <a href="{{ url_for('movies.movie_details', movie_id=featured_movie._id) }}" class="btn btn-outline" style="padding: 0.75rem 1.4rem;">ℹ View Cast & Details</a>
+        </div>
+    </div>
+</section>
+{% endif %}
+
+<div class="container">
+
+    <!-- South Indian Cinema Section -->
+    <div class="section-header" style="margin-top: 1rem;">
+        <div>
+            <h2 class="section-title">🌟 South Indian Cinema Showcase</h2>
+            <p style="color: var(--text-muted); font-size: 0.88rem; margin-top: 0.3rem;">
+                Epic Telugu, Tamil, Malayalam, and Kannada pan-India masterworks with native audio tracks and subtitles.
+            </p>
+        </div>
+        <a href="{{ url_for('movies.movie_list', region='south') }}" class="btn btn-sm btn-outline">Explore All South Indian</a>
+    </div>
+
+    <div class="movie-grid">
+        {% for movie in south_indian_movies %}
+        <div class="movie-card">
+            <div class="movie-card-poster-wrap">
+                <img src="{{ movie.poster_url }}" alt="{{ movie.title }}" class="movie-card-poster" loading="lazy">
+                <span class="movie-card-badge">⭐ {{ movie.rating }}</span>
+                <span style="position: absolute; bottom: 8px; left: 8px; background: rgba(0,0,0,0.85); border: 1px solid #f59e0b; color: #fcd34d; font-size: 0.75rem; font-weight: 700; padding: 2px 7px; border-radius: 4px;">
+                    {{ movie.language }}
+                </span>
+            </div>
+            <div class="movie-card-body">
+                <h3 class="movie-card-title">{{ movie.title }}</h3>
+                <p class="movie-card-info">{{ movie.genres|slice(2)|first|join(' • ') }} • {{ movie.runtime }}m</p>
+                <div class="movie-card-actions">
+                    <a href="{{ url_for('movies.movie_details', movie_id=movie._id) }}" class="btn btn-sm btn-primary" style="flex: 1;">Book</a>
+                    <a href="{{ url_for('movies.movie_details', movie_id=movie._id) }}" class="btn btn-sm btn-outline">Details</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Now Showing Across All Genres -->
+    <div class="section-header" style="margin-top: 1.5rem;">
+        <div>
+            <h2 class="section-title">Now Showing Across Diverse Genres</h2>
+            <p style="color: var(--text-muted); font-size: 0.88rem; margin-top: 0.3rem;">
+                Action, Sci-Fi, Horror, Animation, Crime, Romance, and Drama films running in theaters now.
+            </p>
+        </div>
+        <a href="{{ url_for('movies.movie_list', status='Now Showing') }}" class="btn btn-sm btn-outline">See All</a>
+    </div>
+
+    <div class="movie-grid">
+        {% for movie in now_showing %}
+        <div class="movie-card">
+            <div class="movie-card-poster-wrap">
+                <img src="{{ movie.poster_url }}" alt="{{ movie.title }}" class="movie-card-poster" loading="lazy">
+                <span class="movie-card-badge">⭐ {{ movie.rating }}</span>
+                <span style="position: absolute; bottom: 8px; left: 8px; background: rgba(0,0,0,0.8); border: 1px solid #3b82f6; color: #93c5fd; font-size: 0.75rem; font-weight: 700; padding: 2px 7px; border-radius: 4px;">
+                    {{ movie.language }}
+                </span>
+            </div>
+            <div class="movie-card-body">
+                <h3 class="movie-card-title">{{ movie.title }}</h3>
+                <p class="movie-card-info">{{ movie.genres|slice(2)|first|join(' • ') }} • {{ movie.runtime }}m</p>
+                <div class="movie-card-actions">
+                    <a href="{{ url_for('movies.movie_details', movie_id=movie._id) }}" class="btn btn-sm btn-primary" style="flex: 1;">Book</a>
+                    <a href="{{ url_for('movies.movie_details', movie_id=movie._id) }}" class="btn btn-sm btn-outline">Details</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Theater Hubs -->
+    <div class="section-header" style="margin-top: 1.5rem;">
+        <h2 class="section-title">CineSphere Multiplex Network</h2>
+        <a href="{{ url_for('public.theaters_list') }}" class="btn btn-sm btn-outline">All Locations</a>
+    </div>
+
+    <div class="dashboard-grid">
+        {% for t in theaters %}
+        <div class="stat-card" style="border-top: 3px solid var(--primary);">
+            <div style="font-size: 1.3rem; margin-bottom: 0.3rem;">🏛 {{ t.name }}</div>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.8rem;">📍 {{ t.address }}, {{ t.city }}</p>
+            <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 1rem;">
+                {% for f in t.facilities[:3] %}
+                <span class="badge">{{ f }}</span>
+                {% endfor %}
+            </div>
+            <a href="{{ url_for('public.theater_details', theater_id=t._id) }}" class="btn btn-sm btn-outline" style="width: 100%;">View Shows & Screens</a>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Top Rated Section -->
+    <div class="section-header" style="margin-top: 2rem;">
+        <h2 class="section-title">Critically Acclaimed Masterpieces</h2>
+    </div>
+
+    <div class="movie-grid">
+        {% for movie in top_rated %}
+        <div class="movie-card">
+            <div class="movie-card-poster-wrap">
+                <img src="{{ movie.poster_url }}" alt="{{ movie.title }}" class="movie-card-poster" loading="lazy">
+                <span class="movie-card-badge">⭐ {{ movie.rating }}</span>
+            </div>
+            <div class="movie-card-body">
+                <h3 class="movie-card-title">{{ movie.title }}</h3>
+                <p class="movie-card-info">{{ movie.genres|slice(2)|first|join(' • ') }} • {{ movie.language }}</p>
+                <div class="movie-card-actions">
+                    <a href="{{ url_for('movies.movie_details', movie_id=movie._id) }}" class="btn btn-sm btn-primary" style="width: 100%;">Explore Movie</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+</div>
+{% endblock %}

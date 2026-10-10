@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Search "{{ query }}" — CineSphere{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="section-header">
+        <h1 class="section-title">Search Results for "{{ query }}"</h1>
+    </div>
+
+    {% if movies %}
+    <div class="movie-grid">
+        {% for movie in movies %}
+        <div class="movie-card">
+            <div class="movie-card-poster-wrap">
+                <img src="{{ movie.poster_url }}" alt="{{ movie.title }}" class="movie-card-poster">
+                <span class="movie-card-badge">⭐ {{ movie.rating }}</span>
+            </div>
+            <div class="movie-card-body">
+                <h3 class="movie-card-title">{{ movie.title }}</h3>
+                <p class="movie-card-info">{{ movie.genres|slice(2)|first|join(' • ') }} • {{ movie.runtime }}m</p>
+                <div class="movie-card-actions">
+                    <a href="{{ url_for('movies.movie_details', movie_id=movie._id) }}" class="btn btn-sm btn-primary" style="flex: 1;">Book Now</a>
+                    <a href="{{ url_for('movies.movie_details', movie_id=movie._id) }}" class="btn btn-sm btn-outline">Details</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 4rem 2rem; text-align: center;">
+        <h2>No movies found matching "{{ query }}"</h2>
+        <p style="color: var(--text-muted); margin-top: 0.5rem;">Try searching by movie title, star actor, or director.</p>
+        <a href="{{ url_for('movies.movie_list') }}" class="btn btn-primary" style="margin-top: 1.5rem;">Browse All Movies</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

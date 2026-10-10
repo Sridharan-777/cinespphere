@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Theater Shows & Schedules — Staff Portal{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="section-header">
+        <h1 class="section-title">Showtimes & Screen Timetables</h1>
+        <a href="{{ url_for('staff.show_create') }}" class="btn btn-primary">+ Schedule New Show</a>
+    </div>
+
+    <div class="table-responsive">
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Movie Title</th>
+                    <th>Screen Format</th>
+                    <th>Date</th>
+                    <th>Timing</th>
+                    <th>Price</th>
+                    <th>Booked / Cap</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in shows %}
+                <tr>
+                    <td><strong>{{ s.movie.title if s.movie else 'Movie' }}</strong></td>
+                    <td>{{ s.screen.name if s.screen else 'Screen' }} ({{ s.screen.screen_type if s.screen else 'Standard' }})</td>
+                    <td>{{ s.show_date }}</td>
+                    <td><strong style="color: #fff;">{{ s.start_time }}</strong> - {{ s.end_time }}</td>
+                    <td>₹{{ s.base_price }}</td>
+                    <td>{{ s.booked_count }} / {{ s.screen.capacity if s.screen else 64 }} seats</td>
+                    <td>
+                        <span class="badge" style="background: rgba(34, 197, 94, 0.2); color: #86efac;">Active</span>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">No shows currently scheduled. Click "+ Schedule New Show" to add one.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

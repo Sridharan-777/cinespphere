@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}System Users — Admin Console{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="section-header">
+        <h1 class="section-title">User Directory & Roles</h1>
+    </div>
+
+    <!-- Filter Pills -->
+    <div style="display: flex; gap: 0.8rem; margin-bottom: 1.5rem;">
+        <a href="{{ url_for('admin.users_list') }}" class="btn btn-sm {% if not selected_role %}btn-primary{% else %}btn-outline{% endif %}">All Roles</a>
+        <a href="{{ url_for('admin.users_list', role='customer') }}" class="btn btn-sm {% if selected_role == 'customer' %}btn-primary{% else %}btn-outline{% endif %}">Customers</a>
+        <a href="{{ url_for('admin.users_list', role='staff') }}" class="btn btn-sm {% if selected_role == 'staff' %}btn-primary{% else %}btn-outline{% endif %}">Staff</a>
+        <a href="{{ url_for('admin.users_list', role='worker') }}" class="btn btn-sm {% if selected_role == 'worker' %}btn-primary{% else %}btn-outline{% endif %}">Workers</a>
+        <a href="{{ url_for('admin.users_list', role='admin') }}" class="btn btn-sm {% if selected_role == 'admin' %}btn-primary{% else %}btn-outline{% endif %}">Admins</a>
+    </div>
+
+    <div class="table-responsive">
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Last Login</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in users %}
+                <tr>
+                    <td><strong>{{ u.name }}</strong></td>
+                    <td>{{ u.email }}</td>
+                    <td><span class="role-tag role-{{ u.role }}">{{ u.role }}</span></td>
+                    <td>
+                        <span class="badge" style="background: {% if u.status == 'active' %}rgba(34, 197, 94, 0.2); color: #86efac;{% else %}rgba(239, 68, 68, 0.2); color: #fca5a5;{% endif %}">
+                            {{ u.status }}
+                        </span>
+                    </td>
+                    <td>{{ u.created_at.strftime('%Y-%m-%d') if u.created_at else '' }}</td>
+                    <td>{{ u.last_login.strftime('%Y-%m-%d %H:%M') if u.last_login else 'Never' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

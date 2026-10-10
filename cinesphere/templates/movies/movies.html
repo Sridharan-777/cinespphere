@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block title %}Movies & Languages — CineSphere{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="section-header">
+        <div>
+            <h1 class="section-title">Explore Cinema by Genre & Language</h1>
+            <p style="color: var(--text-muted); font-size: 0.92rem; margin-top: 0.4rem;">
+                Browse {{ total_count }} titles across South Indian cinema (Telugu, Tamil, Malayalam, Kannada) and global blockbuster genres.
+            </p>
+        </div>
+    </div>
+
+    <!-- Filter Control Board -->
+    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.4rem; margin-bottom: 2rem; display: flex; flex-direction: column; gap: 1.2rem;">
+        
+        <!-- Region / Industry Filter -->
+        <div style="display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 0.8rem;">
+            <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 700; width: 110px;">Cinema Realm:</span>
+            <a href="{{ url_for('movies.movie_list', region='all', lang='all', genre=selected_genre, status=selected_status) }}" class="btn btn-sm {% if selected_region == 'all' %}btn-primary{% else %}btn-outline{% endif %}">
+                All Cinemas ({{ total_count }})
+            </a>
+            <a href="{{ url_for('movies.movie_list', region='south', lang='all', genre=selected_genre, status=selected_status) }}" class="btn btn-sm {% if selected_region == 'south' %}btn-primary{% else %}btn-outline{% endif %}" style="border-color: #f59e0b; color: #fcd34d;">
+                🌟 South Indian Cinema ({{ south_indian_count }})
+            </a>
+            <a href="{{ url_for('movies.movie_list', region='global', lang='all', genre=selected_genre, status=selected_status) }}" class="btn btn-sm {% if selected_region == 'global' %}btn-primary{% else %}btn-outline{% endif %}">
+                🌍 Global & Hollywood
+            </a>
+        </div>
+
+        <!-- Languages Pills -->
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 0.8rem;">
+            <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 700; width: 110px;">Language:</span>
+            <a href="{{ url_for('movies.movie_list', lang='all', region=selected_region, genre=selected_genre, status=selected_status) }}" class="chip {% if selected_lang == 'all' %}active-chip{% endif %}" style="text-decoration: none;">
+                All Languages
+            </a>
+            {% for lang in all_languages %}
+            <a href="{{ url_for('movies.movie_list', lang=lang, region=selected_region, genre=selected_genre, status=selected_status) }}" class="chip {% if selected_lang == lang %}active-chip{% endif %}" style="text-decoration: none;">
+                {% if lang in ['Telugu', 'Tamil', 'Malayalam', 'Kannada'] %}🌟 {% endif %}{{ lang }}
+            </a>
+            {% endfor %}
+        </div>
+
+        <!-- Genres Pills -->
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 0.8rem;">
+            <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 700; width: 110px;">Genre:</span>
+            <a href="{{ url_for('movies.movie_list', genre='all', lang=selected_lang, region=selected_region, status=selected_status) }}" class="chip {% if selected_genre == 'all' %}active-chip{% endif %}" style="text-decoration: none;">
+                All Genres
+            </a>
+            {% for g in all_genres %}
+            <a href="{{ url_for('movies.movie_list', genre=g, lang=selected_lang, region=selected_region, status=selected_status) }}" class="chip {% if selected_genre == g %}active-chip{% endif %}" style="text-decoration: none;">
+                {{ g }}
+            </a>
+            {% endfor %}
+        </div>
+
+        <!-- Status & Sorting Row -->
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+            <div style="display: flex; gap: 0.6rem; align-items: center;">
+                <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 700;">Availability:</span>
+                <a href="{{ url_for('movies.movie_list', status='all', genre=selected_genre, lang=selected_lang, region=selected_region) }}" class="btn btn-sm {% if selected_status == 'all' %}btn-primary{% else %}btn-outline{% endif %}">All</a>
+                <a href="{{ url_for('movies.movie_list', status='Now Showing', genre=selected_genre, lang=selected_lang, region=selected_region) }}" class="btn btn-sm {% if selected_status == 'Now Showing' %}btn-primary{% else %}btn-outline{% endif %}">Now Showing</a>
+                <a href="{{ url_for('movies.movie_list', status='Coming Soon', genre=selected_genre, lang=selected_lang, region=selected_region) }}" class="btn btn-sm {% if selected_status == 'Coming Soon' %}btn-primary{% else %}btn-outline{% endif %}">Coming Soon</a>
+            </div>
+
+            <div style="display: flex; gap: 0.6rem; align-items: center;">
+                <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 700;">Sort By:</span>
+                <a href="{{ url_for('movies.movie_list', status=selected_status, genre=selected_genre, lang=selected_lang, region=selected_region, sort='popularity') }}" class="btn btn-sm {% if selected_sort == 'popularity' %}btn-accent{% else %}btn-outline{% endif %}">Popularity</a>
+                <a href="{{ url_for('movies.movie_list', status=selected_status, genre=selected_genre, lang=selected_lang, region=selected_region, sort='rating') }}" class="btn btn-sm {% if selected_sort == 'rating' %}btn-accent{% else %}btn-outline{% endif %}">Rating</a>
+                <a href="{{ url_for('movies.movie_list', status=selected_status, genre=selected_genre, lang=selected_lang, region=selected_region, sort='release_date') }}" class="btn btn-sm {% if selected_sort == 'release_date' %}btn-accent{% else %}btn-outline{% endif %}">Release</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Filter Feedback -->
+    {% if selected_lang != 'all' or selected_genre != 'all' or selected_region != 'all' or selected_status != 'all' %}
+    <div style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.8rem; font-size: 0.88rem;">
+        <span style="color: var(--text-muted);">Active Filters:</span>
+        {% if selected_region != 'all' %}<span class="badge" style="background: rgba(245, 158, 11, 0.2); color: #fcd34d;">Region: {{ selected_region|upper }}</span>{% endif %}
+        {% if selected_lang != 'all' %}<span class="badge" style="background: rgba(59, 130, 246, 0.2); color: #93c5fd;">Language: {{ selected_lang }}</span>{% endif %}
+        {% if selected_genre != 'all' %}<span class="badge" style="background: rgba(34, 197, 94, 0.2); color: #86efac;">Genre: {{ selected_genre }}</span>{% endif %}
+        {% if selected_status != 'all' %}<span class="badge">{{ selected_status }}</span>{% endif %}
+        <a href="{{ url_for('movies.movie_list') }}" style="color: var(--primary); text-decoration: underline; margin-left: 0.5rem;">Reset All</a>
+    </div>
+    {% endif %}
+
+    <!-- Movie Grid -->
+    <div class="movie-grid">
+        {% for movie in movies %}
+        <div class="movie-card">
+            <div class="movie-card-poster-wrap">
+                <img src="{{ movie.poster_url }}" alt="{{ movie.title }}" class="movie-card-poster" loading="lazy">
+                <span class="movie-card-badge">⭐ {{ movie.rating }}</span>
+                {% if movie.is_south_indian %}
+                <span style="position: absolute; bottom: 8px; left: 8px; background: rgba(0,0,0,0.8); border: 1px solid #f59e0b; color: #fcd34d; font-size: 0.72rem; font-weight: 700; padding: 2px 6px; border-radius: 4px;">
+                    {{ movie.language }}
+                </span>
+                {% else %}
+                <span style="position: absolute; bottom: 8px; left: 8px; background: rgba(0,0,0,0.8); border: 1px solid #3b82f6; color: #93c5fd; font-size: 0.72rem; font-weight: 700; padding: 2px 6px; border-radius: 4px;">
+                    {{ movie.language }}
+                </span>
+                {% endif %}
+            </div>
+            <div class="movie-card-body">
+                <h3 class="movie-card-title">{{ movie.title }}</h3>
+                <p class="movie-card-info">{{ movie.genres|slice(2)|first|join(' • ') }} • {{ movie.runtime }}m</p>
+                <div class="movie-card-actions">
+                    <a href="{{ url_for('movies.movie_details', movie_id=movie._id) }}" class="btn btn-sm btn-primary" style="flex: 1;">Book Now</a>
+                    <a href="{{ url_for('movies.movie_details', movie_id=movie._id) }}" class="btn btn-sm btn-outline">Details</a>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div style="grid-column: 1 / -1; text-align: center; padding: 4rem; background: var(--bg-card); border-radius: 12px;">
+            <h3>No movies found</h3>
+            <p style="color: var(--text-muted); margin-top: 0.5rem;">No films matching the selected language, genre, or status filter.</p>
+            <a href="{{ url_for('movies.movie_list') }}" class="btn btn-primary" style="margin-top: 1rem;">View All Movies</a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+.active-chip {
+    background: var(--primary) !important;
+    color: #fff !important;
+    border-color: var(--primary) !important;
+    font-weight: 700;
+}
+</style>
+{% endblock %}

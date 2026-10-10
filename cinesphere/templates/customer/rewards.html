@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 2rem; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div>
+            <h1 style="font-size: 2rem; font-family: var(--font-heading);">Rewards Center</h1>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">Redeem your loyalty points for exclusive theater perks.</p>
+        </div>
+        <div style="text-align: right;">
+            <div style="font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Current Balance</div>
+            <div style="font-size: 2.2rem; font-weight: 800; font-family: var(--font-heading); color: var(--accent);">{{ loyalty_points }} <span style="font-size: 1rem; color: var(--text-muted);">pts</span></div>
+        </div>
+    </div>
+
+    <!-- Progress to next tier -->
+    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem;">
+        <h3 style="font-size: 1.1rem; margin-bottom: 1rem;">Next Reward Goal (500 pts)</h3>
+        <div style="height: 12px; background: var(--bg-secondary); border-radius: 6px; overflow: hidden; margin-bottom: 0.5rem;">
+            <div style="height: 100%; width: {% if loyalty_points >= 500 %}100{% else %}{{ (loyalty_points / 500) * 100 }}{% endif %}%; background: linear-gradient(90deg, var(--primary), var(--accent)); transition: width 0.5s ease;"></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-muted);">
+            <span>0 pts</span>
+            <span>VIP Lounge Access</span>
+        </div>
+    </div>
+
+    <div class="dashboard-grid">
+        <div class="stat-card" style="display: flex; flex-direction: column;">
+            <h3 style="font-size: 1.2rem; margin-bottom: 0.5rem; font-family: var(--font-heading);">🍿 Free Popcorn</h3>
+            <p style="color: var(--text-muted); font-size: 0.9rem; flex-grow: 1;">Redeem 100 points for a small free popcorn.</p>
+            <form action="{{ url_for('customer.redeem_reward') }}" method="POST" style="margin-top: 1.5rem;">
+                <input type="hidden" name="cost" value="100">
+                <input type="hidden" name="reward_name" value="Free Popcorn">
+                <button type="submit" class="btn btn-outline" style="width: 100%;" {% if loyalty_points < 100 %}disabled{% endif %}>Redeem (100 pts)</button>
+            </form>
+        </div>
+        
+        <div class="stat-card" style="display: flex; flex-direction: column;">
+            <h3 style="font-size: 1.2rem; margin-bottom: 0.5rem; font-family: var(--font-heading);">💺 Ticket Upgrade</h3>
+            <p style="color: var(--text-muted); font-size: 0.9rem; flex-grow: 1;">Redeem 200 points for a free upgrade to premium seating.</p>
+            <form action="{{ url_for('customer.redeem_reward') }}" method="POST" style="margin-top: 1.5rem;">
+                <input type="hidden" name="cost" value="200">
+                <input type="hidden" name="reward_name" value="Ticket Upgrade">
+                <button type="submit" class="btn btn-primary" style="width: 100%;" {% if loyalty_points < 200 %}disabled{% endif %}>Redeem (200 pts)</button>
+            </form>
+        </div>
+        
+        <div class="stat-card" style="display: flex; flex-direction: column; border: 1px solid var(--accent);">
+            <div style="position: absolute; top: -10px; right: 15px; background: var(--accent); color: #000; font-size: 0.7rem; font-weight: 800; padding: 3px 8px; border-radius: 4px;">VIP ONLY</div>
+            <h3 style="font-size: 1.2rem; margin-bottom: 0.5rem; font-family: var(--font-heading); color: var(--accent);">👑 VIP Lounge</h3>
+            <p style="color: var(--text-muted); font-size: 0.9rem; flex-grow: 1;">Redeem 500 points for one-time VIP lounge access.</p>
+            <form action="{{ url_for('customer.redeem_reward') }}" method="POST" style="margin-top: 1.5rem;">
+                <input type="hidden" name="cost" value="500">
+                <input type="hidden" name="reward_name" value="VIP Lounge Access">
+                <button type="submit" class="btn btn-accent" style="width: 100%;" {% if loyalty_points < 500 %}disabled{% endif %}>Redeem (500 pts)</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

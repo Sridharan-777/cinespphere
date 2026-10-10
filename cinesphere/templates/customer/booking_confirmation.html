@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Booking Confirmed — {{ booking.booking_code }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 750px;">
+    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 2.5rem; text-align: center;">
+        <div style="font-size: 3.5rem; margin-bottom: 0.5rem;">🎉</div>
+        <h1 style="font-size: 2.2rem; font-family: var(--font-heading); margin-bottom: 0.5rem; color: var(--success);">
+            Booking Confirmed!
+        </h1>
+        <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 2rem;">
+            Your movie tickets have been reserved and payment was successfully authorized.
+        </p>
+
+        <!-- Booking summary box -->
+        <div style="background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 10px; padding: 1.8rem; text-align: left; margin-bottom: 2rem;">
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 1rem; margin-bottom: 1rem;">
+                <div>
+                    <span style="font-size: 0.8rem; color: var(--text-muted); display: block;">Booking Code</span>
+                    <strong style="font-size: 1.2rem; color: var(--accent);">{{ booking.booking_code }}</strong>
+                </div>
+                <div style="text-align: right;">
+                    <span style="font-size: 0.8rem; color: var(--text-muted); display: block;">Transaction ID</span>
+                    <strong style="font-size: 0.95rem;">{{ booking.transaction_id }}</strong>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; font-size: 0.95rem;">
+                <div>
+                    <span style="color: var(--text-muted); font-size: 0.85rem; display: block;">Movie</span>
+                    <strong>{{ booking.movie_title }}</strong>
+                </div>
+                <div>
+                    <span style="color: var(--text-muted); font-size: 0.85rem; display: block;">Theater</span>
+                    <strong>{{ booking.theater_name }}</strong>
+                </div>
+                <div>
+                    <span style="color: var(--text-muted); font-size: 0.85rem; display: block;">Auditorium</span>
+                    <strong>{{ booking.screen_name }}</strong>
+                </div>
+                <div>
+                    <span style="color: var(--text-muted); font-size: 0.85rem; display: block;">Showtime</span>
+                    <strong>{{ booking.show_date }} at {{ booking.start_time }}</strong>
+                </div>
+                <div>
+                    <span style="color: var(--text-muted); font-size: 0.85rem; display: block;">Reserved Seats</span>
+                    <strong style="color: var(--primary);">{{ booking.seats|join(', ') }}</strong>
+                </div>
+                <div>
+                    <span style="color: var(--text-muted); font-size: 0.85rem; display: block;">Total Paid</span>
+                    <strong style="color: var(--success); font-size: 1.1rem;">₹{{ booking.pricing.grand_total }}</strong>
+                </div>
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 1rem; justify-content: center;">
+            <a href="{{ url_for('booking.ticket', booking_code=booking.booking_code) }}" class="btn btn-primary" target="_blank">
+                🎟 View & Print Digital Ticket
+            </a>
+            <a href="{{ url_for('customer.my_bookings') }}" class="btn btn-outline">
+                Go to My Bookings
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

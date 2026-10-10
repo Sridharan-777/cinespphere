@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Notifications — CineSphere{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 750px;">
+    <div class="section-header">
+        <h1 class="section-title">Account Notifications</h1>
+    </div>
+
+    {% if notifications %}
+    <div style="display: flex; flex-direction: column; gap: 0.8rem;">
+        {% for n in notifications %}
+        <div style="background: var(--bg-card); border-left: 4px solid {% if n.type == 'success' %}var(--success){% elif n.type == 'warning' %}var(--warning){% else %}var(--info){% endif %}; border-radius: 8px; padding: 1.2rem;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.3rem;">
+                <strong style="color: #fff; font-size: 1rem;">{{ n.title }}</strong>
+                <span style="font-size: 0.75rem; color: var(--text-muted);">{{ n.created_at.strftime('%d %b %H:%M') if n.created_at else '' }}</span>
+            </div>
+            <p style="color: #d1d1d6; font-size: 0.88rem; line-height: 1.5;">{{ n.message }}</p>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p style="text-align: center; color: var(--text-muted); padding: 3rem; background: var(--bg-card); border-radius: 10px;">You have no new notifications.</p>
+    {% endif %}
+</div>
+{% endblock %}

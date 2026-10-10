@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Review Moderation — Admin Console{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="section-header">
+        <h1 class="section-title">Review Moderation Center</h1>
+    </div>
+
+    <div class="table-responsive">
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Movie</th>
+                    <th>Customer</th>
+                    <th>Rating</th>
+                    <th>Title & Content</th>
+                    <th>Verification</th>
+                    <th>Status</th>
+                    <th>Moderation</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in reviews %}
+                <tr>
+                    <td><strong>{{ r.movie_title }}</strong></td>
+                    <td>{{ r.customer_name }}</td>
+                    <td><span style="color: var(--accent);">{{ '★' * r.rating }}</span></td>
+                    <td>
+                        <strong>{{ r.title }}</strong><br>
+                        <small style="color: var(--text-muted);">{{ r.comment }}</small>
+                    </td>
+                    <td>
+                        {% if r.is_verified %}
+                        <span class="badge" style="background: rgba(34, 197, 94, 0.2); color: #86efac;">✓ Verified</span>
+                        {% else %}
+                        <span class="badge">Unverified</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge" style="background: {% if r.status == 'Published' %}rgba(34, 197, 94, 0.2); color: #86efac;{% elif r.status == 'Rejected' %}rgba(239, 68, 68, 0.2); color: #fca5a5;{% else %}rgba(245, 158, 11, 0.2); color: #fcd34d;{% endif %}">
+                            {{ r.status }}
+                        </span>
+                    </td>
+                    <td>
+                        <form action="{{ url_for('admin.moderate_review', review_id=r._id) }}" method="POST" style="display: flex; gap: 0.4rem;">
+                            {% if r.status != 'Published' %}
+                            <button type="submit" name="action" value="Published" class="btn btn-sm btn-success">Publish</button>
+                            {% endif %}
+                            {% if r.status != 'Rejected' %}
+                            <button type="submit" name="action" value="Rejected" class="btn btn-sm btn-danger">Reject</button>
+                            {% endif %}
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">No reviews pending moderation.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
