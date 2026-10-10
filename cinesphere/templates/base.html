@@ -30,12 +30,15 @@
                         <a href="{{ url_for('movies.movie_list') }}" class="nav-link {% if request.blueprint == 'movies' %}active{% endif %}">Movies</a>
                         <a href="{{ url_for('customer.dashboard') }}" class="nav-link {% if request.endpoint == 'customer.dashboard' %}active{% endif %}">Dashboard</a>
                         <a href="{{ url_for('customer.my_bookings') }}" class="nav-link {% if request.endpoint == 'customer.my_bookings' %}active{% endif %}">Bookings</a>
+                        <a href="{{ url_for('customer.live_shows') }}" class="nav-link {% if request.endpoint == 'customer.live_shows' %}active{% endif %}">Live Shows</a>
+                        <a href="{{ url_for('customer.my_reviews') }}" class="nav-link {% if request.endpoint == 'customer.my_reviews' %}active{% endif %}">Reviews</a>
                         <a href="{{ url_for('customer.notifications') }}" class="nav-link {% if request.endpoint == 'customer.notifications' %}active{% endif %}">Alerts</a>
                     {% elif session.get('role') == 'staff' %}
                         <a href="{{ url_for('staff.dashboard') }}" class="nav-link {% if request.endpoint == 'staff.dashboard' %}active{% endif %}">Dashboard</a>
                         <a href="{{ url_for('staff.customers_list') }}" class="nav-link {% if request.endpoint == 'staff.customers_list' %}active{% endif %}">Patrons</a>
                         <a href="{{ url_for('staff.workers_list') }}" class="nav-link {% if request.endpoint and 'worker' in request.endpoint %}active{% endif %}">Workers</a>
                         <a href="{{ url_for('staff.shows_list') }}" class="nav-link {% if request.endpoint and 'show' in request.endpoint %}active{% endif %}">Shows</a>
+                        <a href="{{ url_for('staff.movies') }}" class="nav-link {% if request.endpoint == 'staff.movies' %}active{% endif %}">Movies</a>
                         <a href="{{ url_for('staff.tasks') }}" class="nav-link {% if request.endpoint == 'staff.tasks' %}active{% endif %}">Tasks</a>
                         <a href="{{ url_for('staff.reports') }}" class="nav-link {% if request.endpoint == 'staff.reports' %}active{% endif %}">Reports</a>
                     {% elif session.get('role') == 'worker' %}

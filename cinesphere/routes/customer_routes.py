@@ -8,6 +8,19 @@ from cinesphere.utils.audit import log_audit, create_notification
 
 customer_bp = Blueprint("customer", __name__)
 
+@customer_bp.route("/customer/live-shows")
+@role_required("customer")
+def live_shows():
+    db = get_db()
+    today = datetime.now(UTC).replace(tzinfo=None).strftime("%Y-%m-%d")
+    shows = list(db.showtimes.find({"status": "active", "show_date": {"$gte": today}}).sort([("show_date", 1), ("start_time", 1)]))
+    for show in shows:
+        show["movie"] = db.movies.find_one({"_id": show["movie_id"]})
+        show["theater"] = db.theaters.find_one({"_id": show["theater_id"]})
+        screen = db.screens.find_one({"_id": show["screen_id"]})
+        show["available_seats"] = max(0, (screen or {}).get("capacity", 48) - len(show.get("booked_seats", [])))
+    return render_template("customer/live_shows.html", shows=shows)
+
 @customer_bp.route("/customer/plans")
 @role_required("customer")
 def plans():

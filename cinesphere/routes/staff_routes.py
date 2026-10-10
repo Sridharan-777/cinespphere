@@ -8,6 +8,11 @@ from cinesphere.utils.decorators import role_required
 from cinesphere.services.report_service import ReportService
 from cinesphere.utils.audit import log_audit
 
+import os
+from uuid import uuid4
+from flask import current_app
+from werkzeug.utils import secure_filename
+
 staff_bp = Blueprint("staff", __name__)
 
 @staff_bp.route("/staff/dashboard")
@@ -88,6 +93,14 @@ def customers_list():
         entry["ticket_count"] += len(booking.get("seats", []))
         if booking.get("status") == "Confirmed":
             entry["theater_spend"] += booking.get("pricing", {}).get("grand_total", 0)
+    for user in db.users.find({"role": "customer"}):
+        entry = patrons.setdefault(str(user["_id"]), {
+            "name": user.get("name", "Customer"), "email": user.get("email", ""),
+            "booking_count": 0, "ticket_count": 0, "theater_spend": 0,
+            "last_visit": "", "last_booking_code": ""
+        })
+        entry["_id"] = user["_id"]
+        entry["status"] = user.get("status", "active")
     customers = list(patrons.values())
     if search:
         customers = [c for c in customers if search in c["name"].lower() or search in c["email"].lower()
@@ -129,6 +142,35 @@ def worker_toggle_status(worker_id):
     db.users.update_one({"_id": worker_oid, "role": "worker"}, {"$set": {"status": new_status}})
     log_audit("STAFF_TOGGLE_WORKER", "worker", worker_oid, f"Worker status set to {new_status}")
     flash(f"Worker status changed to {new_status}.", "success")
+    return redirect(url_for("staff.workers_list"))
+
+@staff_bp.route("/staff/workers/<worker_id>/attendance", methods=["POST"])
+@role_required("staff")
+def worker_attendance(worker_id):
+    db = get_db()
+    staff = db.staff.find_one({"user_id": ObjectId(session["user_id"])})
+    worker = find_worker(worker_id, staff["theater_id"], active_only=True) if staff else None
+    if not worker:
+        abort(404)
+    now = datetime.now(UTC).replace(tzinfo=None)
+    today = now.strftime("%Y-%m-%d")
+    action = request.form.get("action")
+    existing = db.attendance.find_one({"worker_id": worker["_id"], "date": today})
+    if action == "check_in" and not existing:
+        db.attendance.insert_one({
+            "worker_id": worker["_id"], "worker_name": worker["name"],
+            "theater_id": worker["theater_id"], "date": today,
+            "check_in": now.strftime("%I:%M %p"), "check_out": None,
+            "status": "Present", "marked_by": staff["user_id"], "created_at": now,
+        })
+        flash(f"Check-in recorded for {worker['name']}.", "success")
+    elif action == "check_out" and existing and not existing.get("check_out"):
+        db.attendance.update_one({"_id": existing["_id"]}, {"$set": {
+            "check_out": now.strftime("%I:%M %p"), "updated_at": now
+        }})
+        flash(f"Check-out recorded for {worker['name']}.", "success")
+    else:
+        flash("That attendance action has already been recorded or is invalid.", "warning")
     return redirect(url_for("staff.workers_list"))
 
 @staff_bp.route("/staff/workers/create", methods=["GET", "POST"])
@@ -318,3 +360,118 @@ def reports():
     bookings = list(db.bookings.find({"theater_id": theater_id}).sort("created_at", -1))
 
     return render_template("staff/reports.html", stats=stats, bookings=bookings, theater=theater)
+
+@staff_bp.route("/staff/workers/<worker_id>/edit", methods=["POST"])
+@role_required("staff")
+def worker_edit(worker_id):
+    db = get_db()
+    staff = db.staff.find_one({"user_id": ObjectId(session["user_id"])})
+    worker = find_worker(worker_id, staff["theater_id"]) if staff else None
+    if not worker:
+        abort(404)
+    salary = request.form.get("monthly_salary", type=float) or worker.get("monthly_salary", 22000)
+    db.users.update_one({"_id": worker["_id"]}, {"$set": {"name": request.form.get("name", worker["name"]).strip()}})
+    update_worker(worker["_id"], {
+        "department": request.form.get("department", worker.get("department", "")).strip(),
+        "designation": request.form.get("designation", worker.get("designation", "")).strip(),
+        "shift_timings": request.form.get("shift_timings", worker.get("shift_timings", "")).strip(),
+        "monthly_salary": salary, "hourly_rate": round(salary / 160, 2),
+    })
+    flash("Worker updated.", "success")
+    return redirect(url_for("staff.workers_list"))
+
+@staff_bp.route("/staff/workers/<worker_id>/delete", methods=["POST"])
+@role_required("staff")
+def worker_delete(worker_id):
+    db = get_db()
+    staff = db.staff.find_one({"user_id": ObjectId(session["user_id"])})
+    worker = find_worker(worker_id, staff["theater_id"]) if staff else None
+    if not worker:
+        abort(404)
+    db.tasks.delete_many({"assigned_worker_id": worker["_id"]})
+    db.attendance.delete_many({"worker_id": worker["_id"]})
+    db.user_sessions.delete_many({"user_id": worker["_id"]})
+    db.users.delete_one({"_id": worker["_id"]})
+    flash("Worker deleted.", "success")
+    return redirect(url_for("staff.workers_list"))
+
+@staff_bp.route("/staff/customers/create", methods=["POST"])
+@role_required("staff")
+def customer_create():
+    db = get_db()
+    name = request.form.get("name", "").strip()
+    email = request.form.get("email", "").strip().lower()
+    if not name or not email or db.users.find_one({"email": email}):
+        flash("A name and unique email are required.", "danger")
+        return redirect(url_for("staff.customers_list"))
+    now = datetime.now(UTC).replace(tzinfo=None)
+    result = db.users.insert_one({"name": name, "email": email, "phone": request.form.get("phone", "").strip(),
+        "password_hash": generate_password_hash(request.form.get("password", "Customer@1234")),
+        "role": "customer", "status": "active", "created_at": now})
+    db.customers.insert_one({"user_id": result.inserted_id, "name": name, "email": email,
+        "phone": request.form.get("phone", "").strip(), "tier": "Free", "favorite_movies": [],
+        "loyalty_points": 0, "total_bookings": 0, "total_spent": 0, "status": "active"})
+    flash("Customer created.", "success")
+    return redirect(url_for("staff.customers_list"))
+
+@staff_bp.route("/staff/customers/<customer_id>/edit", methods=["POST"])
+@role_required("staff")
+def customer_edit(customer_id):
+    db = get_db()
+    customer_oid = ObjectId(customer_id)
+    name = request.form.get("name", "").strip()
+    email = request.form.get("email", "").strip().lower()
+    status = request.form.get("status", "active")
+    if not name or not email or status not in {"active", "inactive"} or db.users.find_one({"email": email, "_id": {"$ne": customer_oid}}):
+        flash("Valid details and a unique email are required.", "danger")
+        return redirect(url_for("staff.customers_list"))
+    db.users.update_one({"_id": customer_oid, "role": "customer"}, {"$set": {"name": name, "email": email, "status": status}})
+    db.customers.update_one({"user_id": customer_oid}, {"$set": {"name": name, "email": email, "status": status}})
+    flash("Customer updated.", "success")
+    return redirect(url_for("staff.customers_list"))
+
+@staff_bp.route("/staff/customers/<customer_id>/delete", methods=["POST"])
+@role_required("staff")
+def customer_delete(customer_id):
+    db = get_db()
+    customer_oid = ObjectId(customer_id)
+    if db.bookings.count_documents({"customer_id": customer_oid}):
+        flash("Customer has booking history; deactivate instead of deleting.", "warning")
+    else:
+        db.customers.delete_one({"user_id": customer_oid})
+        db.users.delete_one({"_id": customer_oid, "role": "customer"})
+        flash("Customer deleted.", "success")
+    return redirect(url_for("staff.customers_list"))
+
+@staff_bp.route("/staff/movies", methods=["GET", "POST"])
+@role_required("staff")
+def movies():
+    db = get_db()
+    if request.method == "POST":
+        title = request.form.get("title", "").strip()
+        if not title:
+            flash("Movie title is required.", "danger")
+            return redirect(url_for("staff.movies"))
+        poster_url = url_for("static", filename="images/default_poster.svg")
+        poster = request.files.get("poster")
+        if poster and poster.filename:
+            ext = os.path.splitext(secure_filename(poster.filename))[1].lower()
+            if ext not in {".jpg", ".jpeg", ".png", ".webp"}:
+                flash("Poster must be JPG, PNG, or WebP.", "danger")
+                return redirect(url_for("staff.movies"))
+            upload_dir = os.path.join(current_app.static_folder, "uploads", "posters")
+            os.makedirs(upload_dir, exist_ok=True)
+            filename = f"{uuid4().hex}{ext}"
+            poster.save(os.path.join(upload_dir, filename))
+            poster_url = url_for("static", filename=f"uploads/posters/{filename}")
+        db.movies.insert_one({"title": title, "original_title": title,
+            "language": request.form.get("language", "English").strip(),
+            "genres": [x.strip() for x in request.form.get("genres", "").split(",") if x.strip()],
+            "runtime": request.form.get("runtime", type=int) or 0, "rating": 0,
+            "director": request.form.get("director", "").strip(), "overview": request.form.get("overview", "").strip(),
+            "release_date": request.form.get("release_date", ""), "status": request.form.get("status", "Now Showing"),
+            "poster_url": poster_url, "cast": [], "created_by_staff": ObjectId(session["user_id"]),
+            "created_at": datetime.now(UTC).replace(tzinfo=None)})
+        flash("Movie added with poster.", "success")
+        return redirect(url_for("staff.movies"))
+    return render_template("staff/movies.html", movies=list(db.movies.find().sort("created_at", -1)))

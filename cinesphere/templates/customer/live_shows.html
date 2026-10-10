@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Live Shows - CineSphere{% endblock %}
+{% block content %}<div class="container"><div class="section-header"><h1 class="section-title">Live and Upcoming Shows</h1></div>
+<div class="dashboard-grid">{% for show in shows %}<div class="stat-card">
+<h3>{{ show.movie.title if show.movie else 'Movie' }}</h3><p>{{ show.theater.name if show.theater else 'CineSphere' }}</p>
+<p><strong>{{ show.show_date }} at {{ show.start_time }}</strong></p><p>{{ show.available_seats }} seats available</p>
+<a class="btn btn-primary" href="{{ url_for('booking.select_seats', showtime_id=show._id) }}">Book Live</a>
+</div>{% else %}<p>No live or upcoming shows.</p>{% endfor %}</div></div>{% endblock %}

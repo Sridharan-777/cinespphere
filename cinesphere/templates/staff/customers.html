@@ -1,24 +1,25 @@
 {% extends "base.html" %}
-{% block title %}Theater Patrons — Staff Portal{% endblock %}
+{% block title %}Customer Management - Staff{% endblock %}
 {% block content %}
 <div class="container">
-    <div class="section-header"><div>
-        <h1 class="section-title">Theater Patrons</h1>
-        <p style="color: var(--text-muted); margin: .35rem 0 0;">Booking-support information for {{ theater_name }} only. Account administration belongs to the system admin.</p>
-    </div></div>
-    <form action="{{ url_for('staff.customers_list') }}" method="GET" style="display:flex; gap:.8rem; margin-bottom:1.5rem; max-width:560px;">
-        <input type="text" name="search" class="form-control" placeholder="Search name, email, or booking code..." value="{{ search }}">
-        <button type="submit" class="btn btn-outline">Search</button>
-    </form>
-    <div class="table-responsive"><table class="custom-table">
-        <thead><tr><th>Customer</th><th>Email</th><th>Bookings</th><th>Tickets</th><th>Theater Spend</th><th>Last Visit</th><th>Latest Booking</th></tr></thead>
-        <tbody>
-        {% for c in customers %}
-        <tr><td><strong>{{ c.name }}</strong></td><td>{{ c.email or 'Not available' }}</td><td>{{ c.booking_count }}</td><td>{{ c.ticket_count }}</td><td>₹{{ c.theater_spend }}</td><td>{{ c.last_visit or 'N/A' }}</td><td><code>{{ c.last_booking_code }}</code></td></tr>
-        {% else %}
-        <tr><td colspan="7" style="text-align:center; color:var(--text-muted);">No patrons with bookings at this theater found.</td></tr>
-        {% endfor %}
-        </tbody>
-    </table></div>
+ <div class="section-header"><h1 class="section-title">Customer CRUD</h1></div>
+ <div class="form-card" style="padding:1.5rem; margin-bottom:1.5rem;">
+  <h2>Add Customer</h2>
+  <form action="{{ url_for('staff.customer_create') }}" method="POST" class="crud-form-grid">
+   <input class="form-control" name="name" placeholder="Name" required><input class="form-control" type="email" name="email" placeholder="Email" required>
+   <input class="form-control" name="phone" placeholder="Phone"><input class="form-control" type="password" name="password" value="Customer@1234" required>
+   <button class="btn btn-primary">Create Customer</button>
+  </form>
+ </div>
+ <form method="GET" style="display:flex;gap:.5rem;margin-bottom:1rem;"><input class="form-control" name="search" value="{{ search }}" placeholder="Search customers"><button class="btn btn-outline">Search</button></form>
+ <div class="table-responsive"><table class="custom-table"><thead><tr><th>Customer</th><th>Activity at {{ theater_name }}</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+ {% for c in customers %}<tr><td><strong>{{ c.name }}</strong><br>{{ c.email }}</td><td>{{ c.booking_count }} bookings / {{ c.ticket_count }} tickets / Rs. {{ c.theater_spend }}</td><td>{{ c.status }}</td><td>
+  <form action="{{ url_for('staff.customer_edit', customer_id=c._id) }}" method="POST" class="crud-form-grid">
+   <input class="form-control" name="name" value="{{ c.name }}" required><input class="form-control" name="email" value="{{ c.email }}" required>
+   <select class="form-control" name="status"><option {% if c.status == 'active' %}selected{% endif %}>active</option><option {% if c.status == 'inactive' %}selected{% endif %}>inactive</option></select><button class="btn btn-sm btn-primary">Save</button>
+  </form>
+  <form action="{{ url_for('staff.customer_delete', customer_id=c._id) }}" method="POST" onsubmit="return confirm('Delete this customer?');"><button class="btn btn-sm btn-danger">Delete</button></form>
+ </td></tr>{% else %}<tr><td colspan="4">No customers found.</td></tr>{% endfor %}
+ </tbody></table></div>
 </div>
 {% endblock %}

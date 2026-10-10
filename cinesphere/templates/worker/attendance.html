@@ -1,70 +1,27 @@
 {% extends "base.html" %}
-
-{% block title %}Daily Attendance — Worker Portal{% endblock %}
-
+{% block title %}Attendance - Worker Portal{% endblock %}
 {% block content %}
-<div class="container" style="max-width: 750px;">
-    <div class="section-header">
-        <h1 class="section-title">Field Worker Attendance</h1>
-    </div>
-
-    <!-- Attendance Action Card -->
-    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 2rem; margin-bottom: 2.5rem; text-align: center;">
-        <h2 style="font-size: 1.4rem; margin-bottom: 0.5rem;">Shift Check-In: {{ today_rec.date if today_rec else 'Today' }}</h2>
-        
+<div class="container" style="max-width:750px;">
+    <div class="section-header"><h1 class="section-title">My Attendance</h1></div>
+    <div class="form-card" style="padding:2rem; margin-bottom:2rem; text-align:center;">
         {% if not today_rec %}
-        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">You haven't marked attendance for today's theater shift yet.</p>
-        <form action="{{ url_for('worker.attendance') }}" method="POST">
-            <input type="hidden" name="action" value="check_in">
-            <button type="submit" class="btn btn-primary" style="padding: 0.8rem 2.2rem; font-size: 1.05rem;">
-                📍 Mark Check-In (Present)
-            </button>
-        </form>
+        <h2>Today's shift is not marked</h2>
+        <p style="color:var(--text-muted);">Your theater staff must record your check-in.</p>
         {% elif not today_rec.check_out %}
-        <p style="color: var(--success); font-weight: 700; margin-bottom: 0.5rem;">Checked In at {{ today_rec.check_in }}</p>
-        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">Shift in progress at {{ worker.theater_name }}.</p>
-        <form action="{{ url_for('worker.attendance') }}" method="POST">
-            <input type="hidden" name="action" value="check_out">
-            <button type="submit" class="btn btn-outline" style="border-color: var(--warning); color: #fcd34d;">
-                Check-Out from Shift
-            </button>
-        </form>
+        <h2 style="color:var(--success);">Checked in at {{ today_rec.check_in }}</h2>
+        <p style="color:var(--text-muted);">Your staff supervisor will record check-out.</p>
         {% else %}
-        <div style="color: var(--success); font-weight: 700; font-size: 1.1rem; margin-bottom: 0.5rem;">
-            ✓ Completed Full Shift Today
-        </div>
-        <p style="color: var(--text-muted); font-size: 0.88rem;">Checked In: {{ today_rec.check_in }} • Checked Out: {{ today_rec.check_out }}</p>
+        <h2 style="color:var(--success);">Shift completed</h2>
+        <p>Checked in: {{ today_rec.check_in }} | Checked out: {{ today_rec.check_out }}</p>
         {% endif %}
     </div>
-
-    <!-- History table -->
-    <div class="section-header">
-        <h3 class="section-title" style="font-size: 1.2rem;">Attendance Log History</h3>
-    </div>
-
-    <div class="table-responsive">
-        <table class="custom-table">
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>Check In</th>
-                    <th>Check Out</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for r in records %}
-                <tr>
-                    <td><strong>{{ r.date }}</strong></td>
-                    <td>{{ r.check_in }}</td>
-                    <td>{{ r.check_out or 'On Duty' }}</td>
-                    <td><span class="badge" style="background: rgba(34, 197, 94, 0.2); color: #86efac;">{{ r.status }}</span></td>
-                </tr>
-                {% else %}
-                <tr><td colspan="4" style="text-align: center; color: var(--text-muted);">No prior attendance records.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+    <div class="table-responsive"><table class="custom-table">
+        <thead><tr><th>Date</th><th>Check In</th><th>Check Out</th><th>Status</th></tr></thead>
+        <tbody>
+        {% for r in records %}
+        <tr><td>{{ r.date }}</td><td>{{ r.check_in }}</td><td>{{ r.check_out or 'On Duty' }}</td><td>{{ r.status }}</td></tr>
+        {% else %}<tr><td colspan="4">No attendance records yet.</td></tr>{% endfor %}
+        </tbody>
+    </table></div>
 </div>
 {% endblock %}

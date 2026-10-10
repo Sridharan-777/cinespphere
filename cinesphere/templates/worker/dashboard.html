@@ -80,6 +80,21 @@
                 Shift Status: <strong>{% if attendance %}Active On Duty{% else %}Awaiting Check-In{% endif %}</strong>
             </div>
         </div>
+        <div class="stat-card" style="border-top: 3px solid #06b6d4;">
+            <div class="stat-title">Attendance Percentage</div>
+            <div class="stat-value" style="color:#67e8f9;">{{ worker_metrics.attendance_percentage }}%</div>
+            <small style="color:var(--text-muted);">{{ worker_metrics.attended_days }} present days out of {{ worker_metrics.working_days }} working days this month</small>
+        </div>
+        <div class="stat-card" style="border-top: 3px solid #f97316;">
+            <div class="stat-title">Rewards Collected</div>
+            <div class="stat-value" style="color:#fdba74;">{{ worker_metrics.rewards_collected }}</div>
+            <small style="color:var(--text-muted);">Earned by completing assigned duties</small>
+        </div>
+        <div class="stat-card" style="border-top: 3px solid #eab308;">
+            <div class="stat-title">Coin Rewards</div>
+            <div class="stat-value" style="color:#fde047;">{{ worker_metrics.reward_coins }} coins</div>
+            <small style="color:var(--text-muted);">10 coins awarded per completed task</small>
+        </div>
     </div>
 
     <!-- Active Tasks for this Worker -->

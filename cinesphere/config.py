@@ -5,6 +5,7 @@ class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "cinesphere-development-key-change-me")
     MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
     DATABASE_NAME = os.getenv("DATABASE_NAME", "cinesphere")
+    MAX_CONTENT_LENGTH = 5 * 1024 * 1024
     TMDB_API_KEY = os.getenv("TMDB_API_KEY", "")
     TMDB_BASE_URL = "https://api.themoviedb.org/3"
     TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p"

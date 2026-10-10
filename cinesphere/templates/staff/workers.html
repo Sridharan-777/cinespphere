@@ -60,10 +60,27 @@
                         </span>
                     </td>
                     <td>
+                        <form action="{{ url_for('staff.worker_attendance', worker_id=w._id) }}" method="POST" style="display:inline;">
+                            <button name="action" value="check_in" class="btn btn-sm btn-success">Check In</button>
+                            <button name="action" value="check_out" class="btn btn-sm btn-outline">Check Out</button>
+                        </form>
                         <form action="{{ url_for('staff.worker_toggle_status', worker_id=w._id) }}" method="POST">
                             <button type="submit" class="btn btn-sm {% if w.status == 'active' %}btn-danger{% else %}btn-success{% endif %}">
                                 {% if w.status == 'active' %}Deactivate{% else %}Activate{% endif %}
                             </button>
+                        </form>
+                        <details><summary>Edit</summary>
+                            <form action="{{ url_for('staff.worker_edit', worker_id=w._id) }}" method="POST" class="crud-form-grid">
+                                <input class="form-control" name="name" value="{{ w.name }}" required>
+                                <input class="form-control" name="department" value="{{ w.department }}" required>
+                                <input class="form-control" name="designation" value="{{ w.designation }}" required>
+                                <input class="form-control" name="shift_timings" value="{{ w.shift_timings }}" required>
+                                <input class="form-control" type="number" name="monthly_salary" value="{{ w.monthly_salary }}" required>
+                                <button class="btn btn-sm btn-primary">Save</button>
+                            </form>
+                        </details>
+                        <form action="{{ url_for('staff.worker_delete', worker_id=w._id) }}" method="POST" onsubmit="return confirm('Delete this worker and operational records?');">
+                            <button class="btn btn-sm btn-danger">Delete</button>
                         </form>
                     </td>
                 </tr>

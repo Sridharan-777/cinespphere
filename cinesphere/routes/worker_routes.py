@@ -1,5 +1,6 @@
 ﻿from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from datetime import UTC, datetime
+import calendar
 from bson import ObjectId
 from cinesphere.models.database import get_db
 from cinesphere.models.worker_model import find_worker, update_worker
@@ -24,6 +25,22 @@ def dashboard():
     # Today attendance
     today_str = datetime.now(UTC).replace(tzinfo=None).strftime("%Y-%m-%d")
     attendance = db.attendance.find_one({"worker_id": worker["_id"], "date": today_str})
+
+    now = datetime.now(UTC).replace(tzinfo=None)
+    month_prefix = now.strftime("%Y-%m")
+    attended_days = db.attendance.count_documents({
+        "worker_id": worker["_id"], "date": {"$regex": f"^{month_prefix}"}, "status": "Present"
+    })
+    working_days = sum(1 for day in range(1, now.day + 1)
+                       if calendar.weekday(now.year, now.month, day) < 5)
+    completed_tasks = db.tasks.count_documents({"assigned_worker_id": worker["_id"], "status": "Completed"})
+    worker_metrics = {
+        "attendance_percentage": round((attended_days / working_days) * 100, 1) if working_days else 0,
+        "attended_days": attended_days,
+        "working_days": working_days,
+        "rewards_collected": completed_tasks,
+        "reward_coins": completed_tasks * 10,
+    }
 
     # Footfall & approaching customers statistics
     theater_id = worker.get("theater_id")
@@ -62,6 +79,7 @@ def dashboard():
                            worker=worker,
                            tasks=tasks,
                            attendance=attendance,
+                           worker_metrics=worker_metrics,
                            patron_stats=patron_stats,
                            benefits=benefits)
 
@@ -108,45 +126,13 @@ def update_task_status(task_id):
     flash(f"Task status changed to {new_status}.", "success")
     return redirect(url_for("worker.dashboard"))
 
-@worker_bp.route("/worker/attendance", methods=["GET", "POST"])
+@worker_bp.route("/worker/attendance")
 @role_required("worker")
 def attendance():
     db = get_db()
     uid = ObjectId(session["user_id"])
     worker = find_worker(uid)
     today_str = datetime.now(UTC).replace(tzinfo=None).strftime("%Y-%m-%d")
-
-    if request.method == "POST":
-        action = request.form.get("action") # check_in or check_out
-        existing = db.attendance.find_one({"worker_id": worker["_id"], "date": today_str})
-
-        if action == "check_in":
-            if not existing:
-                db.attendance.insert_one({
-                    "worker_id": worker["_id"],
-                    "worker_name": worker["name"],
-                    "theater_id": worker["theater_id"],
-                    "date": today_str,
-                    "check_in": datetime.now(UTC).replace(tzinfo=None).strftime("%I:%M %p"),
-                    "check_out": None,
-                    "status": "Present",
-                    "created_at": datetime.now(UTC).replace(tzinfo=None)
-                })
-                flash("Attendance recorded: Shift check-in successful!", "success")
-            else:
-                flash("You have already checked in today.", "info")
-
-        elif action == "check_out":
-            if existing:
-                db.attendance.update_one(
-                    {"_id": existing["_id"]},
-                    {"$set": {"check_out": datetime.now(UTC).replace(tzinfo=None).strftime("%I:%M %p")}}
-                )
-                flash("Checked out from shift successfully!", "success")
-            else:
-                flash("Please check in first before checking out.", "warning")
-
-        return redirect(url_for("worker.attendance"))
 
     records = list(db.attendance.find({"worker_id": worker["_id"]}).sort("date", -1).limit(30))
     today_rec = db.attendance.find_one({"worker_id": worker["_id"], "date": today_str})

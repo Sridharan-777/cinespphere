@@ -37,6 +37,7 @@ def init_db(app):
         db.reviews.create_index([("movie_id", 1), ("customer_id", 1)])
         db.tasks.create_index("assigned_worker_id")
         db.tasks.create_index("theater_id")
+        db.attendance.create_index([("worker_id", 1), ("date", 1)], unique=True)
         db.users.create_index([("role", 1), ("worker_profile.theater_id", 1), ("status", 1)])
         db.notifications.create_index("user_id")
         db.audit_logs.create_index("created_at")
