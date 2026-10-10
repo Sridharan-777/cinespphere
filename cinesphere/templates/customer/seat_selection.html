@@ -102,9 +102,9 @@
             
             {% if session.get('user_id') %}
             <button type="submit" id="btn-pay" class="btn btn-primary" style="padding: 0.75rem 1.8rem; font-size: 1rem;" disabled>
-                {% if employee_benefits %}Apply employee benefit{% elif payment_configured %}Pay securely{% else %}Complete demo booking{% endif %}
+                {% if employee_benefits %}Apply employee benefit{% elif payment_configured %}Pay securely{% else %}Book now{% endif %}
             </button>
-            {% if not payment_configured %}<span class="payment-status-note">Demo mode: no money is charged. Add Razorpay keys to enable live checkout.</span>{% endif %}
+            {% if not payment_configured %}<span class="payment-status-note">Online payment is unavailable. Book now to confirm your seats directly.</span>{% endif %}
             {% else %}
             <a href="{{ url_for('auth.login', next=request.url) }}" class="btn btn-primary">
                 Sign In to Reserve Seats
@@ -211,15 +211,15 @@ document.getElementById('checkout-form').addEventListener('submit', async functi
     }
     if (!paymentConfigured) {
         payBtn.disabled = true;
-        payBtn.innerText = 'Completing demo booking...';
+        payBtn.innerText = 'Confirming booking...';
         try {
-            const demoData = new FormData(this);
-            const response = await fetch("{{ url_for('booking.book_direct', showtime_id=showtime._id) }}", {method: 'POST', body: demoData});
+            const bookingData = new FormData(this);
+            const response = await fetch("{{ url_for('booking.book_direct', showtime_id=showtime._id) }}", {method: 'POST', body: bookingData});
             const result = await response.json();
-            if (!response.ok || !result.success) throw new Error(result.error || 'Demo booking failed.');
+            if (!response.ok || !result.success) throw new Error(result.error || 'Booking failed.');
             window.location.href = result.redirect_url;
         } catch (err) {
-            alert(err.message || 'Demo booking could not be completed.');
+            alert(err.message || 'Booking could not be completed.');
             resetPaymentButton();
         }
         return;
@@ -271,7 +271,7 @@ document.getElementById('checkout-form').addEventListener('submit', async functi
 function resetPaymentButton() {
     const payBtn = document.getElementById('btn-pay');
     payBtn.disabled = selectedSeats.length === 0;
-    payBtn.innerText = employeeBenefits ? 'Apply employee benefit' : (paymentConfigured ? 'Pay securely' : 'Complete demo booking');
+    payBtn.innerText = employeeBenefits ? 'Apply employee benefit' : (paymentConfigured ? 'Pay securely' : 'Book now');
 }
 
 </script>

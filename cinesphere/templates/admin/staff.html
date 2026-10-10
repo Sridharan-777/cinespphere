@@ -83,10 +83,27 @@
                         </span>
                     </td>
                     <td>
-                        <form action="{{ url_for('admin.staff_toggle_status', staff_id=s._id) }}" method="POST">
+                        <form action="{{ url_for('admin.staff_toggle_status', staff_id=s._id) }}" method="POST" style="display:inline-block;">
                             <button type="submit" class="btn btn-sm {% if s.status == 'active' %}btn-danger{% else %}btn-success{% endif %}">
                                 {% if s.status == 'active' %}Deactivate{% else %}Activate{% endif %}
                             </button>
+                        </form>
+                        <form action="{{ url_for('admin.staff_delete', staff_id=s._id) }}" method="POST" style="display:inline-block;" onsubmit="return confirm('Delete this staff account permanently?');">
+                            <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="7">
+                        <form action="{{ url_for('admin.staff_edit', staff_id=s._id) }}" method="POST" class="crud-form-grid">
+                            <input class="form-control" name="name" value="{{ s.name }}" required>
+                            <input class="form-control" type="email" name="email" value="{{ s.email }}" required>
+                            <input class="form-control" name="phone" value="{{ s.phone or '' }}" placeholder="Phone">
+                            <input class="form-control" name="designation" value="{{ s.designation }}" required>
+                            <select class="form-control" name="theater_id" required>
+                                {% for t in theaters %}<option value="{{ t._id }}" {% if t._id == s.theater_id %}selected{% endif %}>{{ t.name }}</option>{% endfor %}
+                            </select>
+                            <button class="btn btn-primary" type="submit">Save Staff Changes</button>
                         </form>
                     </td>
                 </tr>

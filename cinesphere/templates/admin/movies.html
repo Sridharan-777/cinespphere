@@ -16,6 +16,24 @@
         </form>
     </div>
 
+    <div class="form-card" style="padding: 1.5rem; margin-bottom: 1.5rem;">
+        <h2 style="font-size:1.15rem; margin-bottom:1rem;">Add Movie Manually</h2>
+        <form action="{{ url_for('admin.movies') }}" method="POST" class="crud-form-grid">
+            <input class="form-control" name="title" placeholder="Movie title" required>
+            <input class="form-control" name="original_title" placeholder="Original title">
+            <input class="form-control" name="language" value="English" placeholder="Language">
+            <input class="form-control" name="genres" placeholder="Genres, comma separated">
+            <input class="form-control" type="number" name="runtime" min="0" placeholder="Runtime in minutes">
+            <input class="form-control" type="number" name="rating" min="0" max="10" step="0.1" placeholder="Rating">
+            <input class="form-control" name="director" placeholder="Director">
+            <input class="form-control" type="date" name="release_date">
+            <input class="form-control" name="poster_url" placeholder="Poster URL">
+            <select class="form-control" name="status"><option>Now Showing</option><option>Coming Soon</option><option>Archived</option></select>
+            <textarea class="form-control" name="overview" placeholder="Overview" style="grid-column:1/-1;"></textarea>
+            <button class="btn btn-primary" type="submit">Create Movie</button>
+        </form>
+    </div>
+
     <div class="table-responsive">
         <table class="custom-table">
             <thead>
@@ -45,6 +63,24 @@
                     <td><span class="badge" style="background: rgba(34, 197, 94, 0.2); color: #86efac;">{{ m.status }}</span></td>
                     <td>
                         <a href="{{ url_for('movies.movie_details', movie_id=m._id) }}" class="btn btn-sm btn-outline">View Page</a>
+                        <form action="{{ url_for('admin.movie_delete', movie_id=m._id) }}" method="POST" style="display:inline-block;" onsubmit="return confirm('Delete this movie and its showtimes?');">
+                            <button class="btn btn-sm btn-danger" type="submit">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="7">
+                        <form action="{{ url_for('admin.movie_edit', movie_id=m._id) }}" method="POST" class="crud-form-grid">
+                            <input class="form-control" name="title" value="{{ m.title }}" required>
+                            <input class="form-control" name="language" value="{{ m.language or 'English' }}">
+                            <input class="form-control" type="number" name="runtime" min="0" value="{{ m.runtime or 0 }}">
+                            <input class="form-control" type="number" name="rating" min="0" max="10" step="0.1" value="{{ m.rating or 0 }}">
+                            <input class="form-control" name="director" value="{{ m.director or '' }}">
+                            <select class="form-control" name="status">
+                                {% for status in ['Now Showing', 'Coming Soon', 'Archived'] %}<option {% if m.status == status %}selected{% endif %}>{{ status }}</option>{% endfor %}
+                            </select>
+                            <button class="btn btn-primary" type="submit">Save Movie Changes</button>
+                        </form>
                     </td>
                 </tr>
                 {% else %}

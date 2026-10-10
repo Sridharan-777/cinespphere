@@ -113,7 +113,7 @@ class BookingService:
             "gateway": {
                 "provider": payment_method,
                 "currency": "INR",
-                "mode": "internal" if payment_method == "Employee Benefit" else ("demo" if payment_method == "Direct Booking" else "online")
+                "mode": "internal" if payment_method in {"Employee Benefit", "Direct Booking"} else "online"
             }
         }
         pay_res = db.payments.insert_one(payment_doc)

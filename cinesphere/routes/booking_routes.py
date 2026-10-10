@@ -234,7 +234,7 @@ def book_direct(showtime_id):
     seat_numbers = [s.strip() for s in seats_selected_str.split(",") if s.strip()]
     customer_id = session.get("user_id")
 
-    # Create Booking directly (No Payment Gateway needed)
+    # Create a direct booking when the online payment gateway is unavailable.
     booking, err = BookingService.create_booking(customer_id, showtime_id, seat_numbers, "Direct Booking")
     if err:
         return jsonify({"success": False, "error": err}), 400

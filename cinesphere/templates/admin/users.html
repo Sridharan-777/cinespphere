@@ -8,6 +8,18 @@
         <h1 class="section-title">User Directory & Roles</h1>
     </div>
 
+    <div class="form-card" style="padding: 1.5rem; margin-bottom: 1.5rem;">
+        <h2 style="font-size: 1.15rem; margin-bottom: 1rem;">Create Customer or Administrator</h2>
+        <form action="{{ url_for('admin.user_create') }}" method="POST" class="crud-form-grid">
+            <input class="form-control" name="name" placeholder="Full name" required>
+            <input class="form-control" type="email" name="email" placeholder="Email address" required>
+            <input class="form-control" name="phone" placeholder="Phone number">
+            <input class="form-control" type="password" name="password" placeholder="Initial password (8+ characters)" minlength="8" required>
+            <select class="form-control" name="role"><option value="customer">Customer</option><option value="admin">Administrator</option></select>
+            <button class="btn btn-primary" type="submit">Create User</button>
+        </form>
+    </div>
+
     <!-- Filter Pills -->
     <div style="display: flex; gap: 0.8rem; margin-bottom: 1.5rem;">
         <a href="{{ url_for('admin.users_list') }}" class="btn btn-sm {% if not selected_role %}btn-primary{% else %}btn-outline{% endif %}">All Roles</a>
@@ -27,6 +39,7 @@
                     <th>Status</th>
                     <th>Created</th>
                     <th>Last Login</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -42,6 +55,24 @@
                     </td>
                     <td>{{ u.created_at.strftime('%Y-%m-%d') if u.created_at else '' }}</td>
                     <td>{{ u.last_login.strftime('%Y-%m-%d %H:%M') if u.last_login else 'Never' }}</td>
+                    <td><details><summary class="btn btn-sm btn-outline">Manage</summary></details></td>
+                </tr>
+                <tr>
+                    <td colspan="7">
+                        <form action="{{ url_for('admin.user_edit', user_id=u._id) }}" method="POST" class="crud-form-grid">
+                            <input class="form-control" name="name" value="{{ u.name }}" required>
+                            <input class="form-control" type="email" name="email" value="{{ u.email }}" required>
+                            <select class="form-control" name="status">
+                                <option value="active" {% if u.status == 'active' %}selected{% endif %}>Active</option>
+                                <option value="inactive" {% if u.status != 'active' %}selected{% endif %}>Inactive</option>
+                            </select>
+                            <input class="form-control" type="password" name="password" placeholder="New password (optional)" minlength="8">
+                            <button class="btn btn-primary" type="submit">Save Changes</button>
+                        </form>
+                        <form action="{{ url_for('admin.user_delete', user_id=u._id) }}" method="POST" style="margin-top:.75rem;" onsubmit="return confirm('Delete this user permanently?');">
+                            <button class="btn btn-sm btn-danger" type="submit">Delete User</button>
+                        </form>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
