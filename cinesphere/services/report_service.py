@@ -1,6 +1,7 @@
 ﻿from datetime import UTC, datetime, date
 from bson import ObjectId
 from cinesphere.models.database import get_db
+from cinesphere.models.worker_model import count_workers
 
 class ReportService:
     @staticmethod
@@ -21,7 +22,7 @@ class ReportService:
         
         screens_count = db.screens.count_documents({"theater_id": t_id, "status": "active"})
         staff_count = db.staff.count_documents({"theater_id": t_id, "status": "active"})
-        worker_count = db.workers.count_documents({"theater_id": t_id, "status": "active"})
+        worker_count = count_workers(t_id, active_only=True)
         pending_tasks = db.tasks.count_documents({"theater_id": t_id, "status": {"$in": ["Pending", "In Progress", "Assigned"]}})
 
         # Calculate Average Ticket Value (ATV)
@@ -61,7 +62,7 @@ class ReportService:
         total_users = db.users.count_documents({"status": "active"})
         total_customers = db.customers.count_documents({"status": "active"})
         total_staff = db.staff.count_documents({"status": "active"})
-        total_workers = db.workers.count_documents({"status": "active"})
+        total_workers = count_workers(active_only=True)
 
         return {
             "total_revenue": total_revenue,

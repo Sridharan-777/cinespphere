@@ -35,15 +35,26 @@ def init_db(app):
         db.bookings.create_index("customer_id")
         db.bookings.create_index("showtime_id")
         db.reviews.create_index([("movie_id", 1), ("customer_id", 1)])
-        db.tasks.create_index("worker_id")
+        db.tasks.create_index("assigned_worker_id")
         db.tasks.create_index("theater_id")
+        db.users.create_index([("role", 1), ("worker_profile.theater_id", 1), ("status", 1)])
         db.notifications.create_index("user_id")
         db.audit_logs.create_index("created_at")
-        # Backfill legacy worker documents created before payroll fields were introduced.
-        db.workers.update_many(
-            {"monthly_salary": {"$exists": False}},
-            {"$set": {"monthly_salary": 22000, "hourly_rate": 137.5, "shift_timings": "09:00 AM - 05:30 PM"}}
-        )
+        # One-time compatibility migration: embed legacy worker records in users.
+        for worker in db.workers.find({}):
+            user_id = worker.get("user_id")
+            if not user_id:
+                continue
+            profile = {key: value for key, value in worker.items()
+                       if key not in {"_id", "user_id", "name", "email", "phone", "status", "created_at"}}
+            profile.setdefault("monthly_salary", 22000)
+            profile.setdefault("hourly_rate", 137.5)
+            profile.setdefault("shift_timings", "09:00 AM - 05:30 PM")
+            result = db.users.update_one({"_id": user_id, "role": "worker"}, {"$set": {"worker_profile": profile}})
+            db.tasks.update_many({"assigned_worker_id": worker["_id"]}, {"$set": {"assigned_worker_id": user_id}})
+            db.attendance.update_many({"worker_id": worker["_id"]}, {"$set": {"worker_id": user_id}})
+            if result.matched_count:
+                db.workers.delete_one({"_id": worker["_id"]})
     except Exception as e:
         app.logger.error("MongoDB initialization failed: %s", e)
         raise RuntimeError("CineSphere could not connect to MongoDB. Start MongoDB and verify MONGO_URI.") from e

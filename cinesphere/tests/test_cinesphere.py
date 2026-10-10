@@ -49,7 +49,7 @@ class CineSphereTestSuite(unittest.TestCase):
         theaters = list(self.db.theaters.find())
         for t in theaters:
             staff_count = self.db.staff.count_documents({"theater_id": t["_id"], "status": "active"})
-            worker_count = self.db.workers.count_documents({"theater_id": t["_id"], "status": "active"})
+            worker_count = self.db.users.count_documents({"role": "worker", "worker_profile.theater_id": t["_id"], "status": "active"})
             self.assertLessEqual(staff_count, 5, f"Theater {t['name']} exceeded 5 staff members")
             self.assertLessEqual(worker_count, 20, f"Theater {t['name']} exceeded 20 field workers")
 
@@ -70,10 +70,10 @@ class CineSphereTestSuite(unittest.TestCase):
         self.assertIsNone(collection.find_one({"_id": inserted.inserted_id}))
 
     def test_worker_salary_and_shift(self):
-        worker = self.db.workers.find_one()
+        worker = self.db.users.find_one({"role": "worker", "worker_profile": {"$exists": True}})
         self.assertIsNotNone(worker)
-        self.assertIn("monthly_salary", worker)
-        self.assertGreater(worker["monthly_salary"], 10000)
+        self.assertIn("monthly_salary", worker["worker_profile"])
+        self.assertGreater(worker["worker_profile"]["monthly_salary"], 10000)
 
     def test_razorpay_order_creation(self):
         order, err = razorpay_service.create_order(500, "REC_TEST_101", {"tier": "Pro"})

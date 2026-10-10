@@ -1,6 +1,7 @@
 ﻿from datetime import UTC, datetime
 from bson import ObjectId
 from cinesphere.models.database import get_db
+from cinesphere.models.worker_model import count_workers
 
 class TheaterModel:
     @staticmethod
@@ -31,4 +32,4 @@ class TheaterModel:
     @staticmethod
     def get_worker_count(theater_id):
         db = get_db()
-        return db.workers.count_documents({"theater_id": ObjectId(theater_id), "status": "active"})
+        return count_workers(theater_id, active_only=True)

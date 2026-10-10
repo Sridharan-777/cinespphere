@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from bson import ObjectId
 from werkzeug.security import generate_password_hash
 from cinesphere.models.database import get_db
+from cinesphere.models.worker_model import count_workers, find_worker, list_workers, update_worker
 from cinesphere.utils.decorators import role_required
 from cinesphere.services.report_service import ReportService
 from cinesphere.utils.audit import log_audit
@@ -36,7 +37,7 @@ def dashboard():
         s["booked_count"] = len(s.get("booked_seats", []))
 
     # Assigned Field Workers for this theater
-    workers = list(db.workers.find({"theater_id": theater_id, "status": "active"}).limit(10))
+    workers = list_workers(theater_id, active_only=True, limit=10)
 
     # Urgent tasks
     urgent_tasks = list(db.tasks.find({"theater_id": theater_id, "status": {"$ne": "Completed"}}).sort("created_at", -1).limit(5))
@@ -103,7 +104,7 @@ def workers_list():
     staff = db.staff.find_one({"user_id": uid})
     theater_id = staff["theater_id"]
 
-    workers = list(db.workers.find({"theater_id": theater_id}).sort("created_at", -1))
+    workers = list_workers(theater_id)
     worker_count = sum(1 for worker in workers if worker.get("status") == "active")
     return render_template("staff/workers.html", workers=workers, theater_name=staff["theater_name"],
                            worker_count=worker_count, max_workers=20)
@@ -118,15 +119,14 @@ def worker_toggle_status(worker_id):
     except Exception:
         flash("Invalid worker identifier.", "danger")
         return redirect(url_for("staff.workers_list"))
-    worker = db.workers.find_one({"_id": worker_oid, "theater_id": staff["theater_id"]}) if staff else None
+    worker = find_worker(worker_oid, staff["theater_id"]) if staff else None
     if not worker:
         abort(404)
     new_status = "inactive" if worker.get("status") == "active" else "active"
-    if new_status == "active" and db.workers.count_documents({"theater_id": staff["theater_id"], "status": "active"}) >= 20:
+    if new_status == "active" and count_workers(staff["theater_id"], active_only=True) >= 20:
         flash("Cannot reactivate this worker because the theater already has 20 active workers.", "danger")
         return redirect(url_for("staff.workers_list"))
-    db.workers.update_one({"_id": worker_oid}, {"$set": {"status": new_status}})
-    db.users.update_one({"_id": worker["user_id"]}, {"$set": {"status": new_status}})
+    db.users.update_one({"_id": worker_oid, "role": "worker"}, {"$set": {"status": new_status}})
     log_audit("STAFF_TOGGLE_WORKER", "worker", worker_oid, f"Worker status set to {new_status}")
     flash(f"Worker status changed to {new_status}.", "success")
     return redirect(url_for("staff.workers_list"))
@@ -140,7 +140,7 @@ def worker_create():
     theater_id = staff["theater_id"]
 
     # Enforce strict maximum 20 workers per theater capacity
-    current_worker_count = db.workers.count_documents({"theater_id": theater_id, "status": "active"})
+    current_worker_count = count_workers(theater_id, active_only=True)
     if current_worker_count >= 20:
         flash("Policy limit reached: Exactly 20 field workers maximum allowed per theater location.", "danger")
         return redirect(url_for("staff.workers_list"))
@@ -159,21 +159,8 @@ def worker_create():
             flash("Email address already registered.", "danger")
             return render_template("staff/worker_form.html")
 
-        user_res = db.users.insert_one({
-            "name": name,
-            "email": email,
-            "phone": phone,
-            "password_hash": generate_password_hash("Worker@1234"),
-            "role": "worker",
-            "status": "active",
-            "created_at": datetime.now(UTC).replace(tzinfo=None)
-        })
-
-        db.workers.insert_one({
-            "user_id": user_res.inserted_id,
+        worker_profile = {
             "employee_code": f"WRK-{staff['theater_name'][:3].upper()}-{current_worker_count + 1:02d}",
-            "name": name,
-            "email": email,
             "theater_id": theater_id,
             "theater_name": staff["theater_name"],
             "department": department,
@@ -181,8 +168,16 @@ def worker_create():
             "monthly_salary": salary,
             "hourly_rate": round(salary / 160, 2),
             "shift_timings": shift,
+            "current_task": "Idle / On Call"
+        }
+        user_res = db.users.insert_one({
+            "name": name,
+            "email": email,
+            "phone": phone,
+            "password_hash": generate_password_hash("Worker@1234"),
+            "role": "worker",
             "status": "active",
-            "current_task": "Idle / On Call",
+            "worker_profile": worker_profile,
             "created_at": datetime.now(UTC).replace(tzinfo=None)
         })
 
@@ -283,7 +278,7 @@ def tasks():
         description = request.form.get("description", "").strip()
         priority = request.form.get("priority", "Medium")
 
-        worker = db.workers.find_one({"_id": worker_id, "theater_id": theater_id, "status": "active"})
+        worker = find_worker(worker_id, theater_id, active_only=True)
         if not worker:
             flash("Worker not found.", "danger")
             return redirect(url_for("staff.tasks"))
@@ -301,13 +296,13 @@ def tasks():
             "created_at": datetime.now(UTC).replace(tzinfo=None)
         })
 
-        db.workers.update_one({"_id": worker_id}, {"$set": {"current_task": title}})
+        update_worker(worker_id, {"current_task": title})
         log_audit("STAFF_CREATE_TASK", "task", task_res.inserted_id, f"Staff assigned task '{title}' to {worker['name']}")
         flash(f"Operational duty dispatched to {worker['name']}.", "success")
         return redirect(url_for("staff.tasks"))
 
     tasks_list = list(db.tasks.find({"theater_id": theater_id}).sort("created_at", -1))
-    workers = list(db.workers.find({"theater_id": theater_id, "status": "active"}))
+    workers = list_workers(theater_id, active_only=True)
     return render_template("staff/tasks.html", tasks=tasks_list, workers=workers)
 
 @staff_bp.route("/staff/reports")

@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from bson import ObjectId
 from werkzeug.security import generate_password_hash
 from cinesphere.models.database import get_db
+from cinesphere.models.worker_model import count_workers, list_workers
 from cinesphere.utils.decorators import role_required
 from cinesphere.services.report_service import ReportService
 from cinesphere.services.tmdb_service import tmdb_service
@@ -18,7 +19,7 @@ def dashboard():
     theaters = list(db.theaters.find({"status": "active"}))
     for t in theaters:
         t["staff_count"] = db.staff.count_documents({"theater_id": t["_id"], "status": "active"})
-        t["worker_count"] = db.workers.count_documents({"theater_id": t["_id"], "status": "active"})
+        t["worker_count"] = count_workers(t["_id"], active_only=True)
         t["screen_count"] = db.screens.count_documents({"theater_id": t["_id"], "status": "active"})
 
     recent_logs = list(db.audit_logs.find().sort("created_at", -1).limit(6))
@@ -75,7 +76,7 @@ def theaters():
     theaters_list = list(db.theaters.find().sort("created_at", -1))
     for t in theaters_list:
         t["staff_count"] = db.staff.count_documents({"theater_id": t["_id"], "status": "active"})
-        t["worker_count"] = db.workers.count_documents({"theater_id": t["_id"], "status": "active"})
+        t["worker_count"] = count_workers(t["_id"], active_only=True)
         t["screen_count"] = db.screens.count_documents({"theater_id": t["_id"], "status": "active"})
 
     return render_template("admin/theaters.html", theaters=theaters_list)
@@ -108,7 +109,7 @@ def edit_theater(theater_id):
         return redirect(url_for("admin.theaters"))
 
     db.staff.update_many({"theater_id": t_id}, {"$set": {"theater_name": updates["name"]}})
-    db.workers.update_many({"theater_id": t_id}, {"$set": {"theater_name": updates["name"]}})
+    db.users.update_many({"role": "worker", "worker_profile.theater_id": t_id}, {"$set": {"worker_profile.theater_name": updates["name"]}})
     log_audit("ADMIN_UPDATE_THEATER", "theater", t_id, f"Admin updated theater {updates['name']}")
     flash("Theater details updated.", "success")
     return redirect(url_for("admin.theater_details", theater_id=theater_id))
@@ -127,7 +128,7 @@ def delete_theater(theater_id):
     if not theater:
         flash("Theater not found.", "danger")
         return redirect(url_for("admin.theaters"))
-    if db.bookings.count_documents({"theater_id": t_id}) or db.staff.count_documents({"theater_id": t_id}) or db.workers.count_documents({"theater_id": t_id}):
+    if db.bookings.count_documents({"theater_id": t_id}) or db.staff.count_documents({"theater_id": t_id}) or count_workers(t_id):
         flash("This theater has linked bookings or personnel. Deactivate it instead of deleting historical data.", "danger")
         return redirect(url_for("admin.theater_details", theater_id=theater_id))
 
@@ -150,7 +151,7 @@ def theater_details(theater_id):
 
     screens = list(db.screens.find({"theater_id": t_id}))
     staff_members = list(db.staff.find({"theater_id": t_id}))
-    workers = list(db.workers.find({"theater_id": t_id}))
+    workers = list_workers(t_id)
     stats = ReportService.get_theater_stats(t_id)
 
     return render_template("admin/theater_details.html",
@@ -530,7 +531,7 @@ def user_edit(user_id):
             return redirect(url_for("admin.users_list"))
         updates["password_hash"] = generate_password_hash(password)
     db.users.update_one({"_id": object_id}, {"$set": updates})
-    profile_collection = {"customer": db.customers, "staff": db.staff, "worker": db.workers}.get(user.get("role"))
+    profile_collection = {"customer": db.customers, "staff": db.staff}.get(user.get("role"))
     if profile_collection is not None:
         profile_collection.update_one({"user_id": object_id}, {"$set": {
             "name": name, "email": email, "status": status, "updated_at": updates["updated_at"]

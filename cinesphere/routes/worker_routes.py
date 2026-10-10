@@ -2,6 +2,7 @@
 from datetime import UTC, datetime
 from bson import ObjectId
 from cinesphere.models.database import get_db
+from cinesphere.models.worker_model import find_worker, update_worker
 from cinesphere.utils.decorators import role_required
 from cinesphere.utils.audit import log_audit
 
@@ -12,7 +13,7 @@ worker_bp = Blueprint("worker", __name__)
 def dashboard():
     db = get_db()
     uid = ObjectId(session["user_id"])
-    worker = db.workers.find_one({"user_id": uid})
+    worker = find_worker(uid)
     if not worker:
         flash("Worker profile not found.", "warning")
         return render_template("errors/403.html"), 403
@@ -69,7 +70,7 @@ def dashboard():
 def tasks_list():
     db = get_db()
     uid = ObjectId(session["user_id"])
-    worker = db.workers.find_one({"user_id": uid})
+    worker = find_worker(uid)
     tasks = list(db.tasks.find({"assigned_worker_id": worker["_id"]}).sort("created_at", -1))
     return render_template("worker/tasks.html", worker=worker, tasks=tasks)
 
@@ -78,7 +79,7 @@ def tasks_list():
 def update_task_status(task_id):
     db = get_db()
     uid = ObjectId(session["user_id"])
-    worker = db.workers.find_one({"user_id": uid})
+    worker = find_worker(uid)
     
     task = db.tasks.find_one({"_id": ObjectId(task_id), "assigned_worker_id": worker["_id"]})
     if not task:
@@ -98,9 +99,9 @@ def update_task_status(task_id):
     if new_status == "Completed":
         update_fields["completed_at"] = datetime.now(UTC).replace(tzinfo=None)
         # Clear current task in worker record
-        db.workers.update_one({"_id": worker["_id"]}, {"$set": {"current_task": "Available / Standby"}})
+        update_worker(worker["_id"], {"current_task": "Available / Standby"})
     elif new_status == "In Progress":
-        db.workers.update_one({"_id": worker["_id"]}, {"$set": {"current_task": task["title"]}})
+        update_worker(worker["_id"], {"current_task": task["title"]})
 
     db.tasks.update_one({"_id": task["_id"]}, {"$set": update_fields})
     log_audit("WORKER_UPDATE_TASK", "task", task["_id"], f"Worker {worker['name']} updated task {task['title']} to {new_status}")
@@ -112,7 +113,7 @@ def update_task_status(task_id):
 def attendance():
     db = get_db()
     uid = ObjectId(session["user_id"])
-    worker = db.workers.find_one({"user_id": uid})
+    worker = find_worker(uid)
     today_str = datetime.now(UTC).replace(tzinfo=None).strftime("%Y-%m-%d")
 
     if request.method == "POST":
@@ -156,6 +157,6 @@ def attendance():
 def profile():
     db = get_db()
     uid = ObjectId(session["user_id"])
-    worker = db.workers.find_one({"user_id": uid})
+    worker = find_worker(uid)
     user = db.users.find_one({"_id": uid})
     return render_template("worker/profile.html", worker=worker, user=user)

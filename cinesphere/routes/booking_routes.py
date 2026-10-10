@@ -2,6 +2,7 @@
 from bson import ObjectId
 from datetime import UTC, datetime
 from cinesphere.models.database import get_db
+from cinesphere.models.worker_model import find_worker
 from cinesphere.utils.decorators import login_required, role_required
 from cinesphere.services.booking_service import BookingService
 from cinesphere.services.razorpay_service import razorpay_service
@@ -95,7 +96,7 @@ def select_seats(showtime_id):
 def book_employee_benefit(showtime_id):
     db = get_db()
     uid = ObjectId(session["user_id"])
-    worker = db.workers.find_one({"user_id": uid, "status": "active"})
+    worker = find_worker(uid, active_only=True)
     if not worker:
         return jsonify({"success": False, "error": "Only active workers can use employee movie benefits."}), 403
 

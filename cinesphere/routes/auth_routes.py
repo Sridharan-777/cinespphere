@@ -3,6 +3,7 @@ from bson import ObjectId
 from flask import current_app
 from cinesphere.models.user_model import UserModel
 from cinesphere.models.database import get_db
+from cinesphere.models.worker_model import find_worker
 from cinesphere.utils.audit import log_audit
 from cinesphere.services.user_session_service import start_user_session, close_user_session
 from cinesphere.oauth import oauth
@@ -45,7 +46,7 @@ def login():
                 session["theater_id"] = str(staff_doc["theater_id"])
                 session["theater_name"] = staff_doc.get("theater_name", "")
         elif user["role"] == "worker":
-            worker_doc = db.workers.find_one({"user_id": user["_id"]})
+            worker_doc = find_worker(user["_id"])
             if worker_doc:
                 session["theater_id"] = str(worker_doc["theater_id"])
                 session["theater_name"] = worker_doc.get("theater_name", "")

@@ -159,6 +159,17 @@ def seed_database():
                 w_email = "worker1@cinesphere.com"
 
             dept = departments[(w_idx - 1) % len(departments)]
+            worker_profile = {
+                "employee_code": f"WRK-{city_prefix.upper()}-{w_idx:02d}",
+                "theater_id": t_id,
+                "theater_name": t_data["name"],
+                "department": dept,
+                "designation": f"{dept} Specialist",
+                "monthly_salary": 22000,
+                "hourly_rate": 137.5,
+                "shift_timings": "09:00 AM - 05:30 PM",
+                "current_task": "Idle / On Standby" if w_idx > 3 else "Auditorium Sound Calibration"
+            }
             worker_u = db.users.insert_one({
                 "name": f"Worker {w_idx} ({t_data['city']})",
                 "email": w_email,
@@ -166,27 +177,14 @@ def seed_database():
                 "password_hash": default_password,
                 "role": "worker",
                 "status": "active",
-                "created_at": datetime.now(UTC).replace(tzinfo=None)
-            })
-
-            w_doc_res = db.workers.insert_one({
-                "user_id": worker_u.inserted_id,
-                "employee_code": f"WRK-{city_prefix.upper()}-{w_idx:02d}",
-                "name": f"Field Worker {w_idx}",
-                "email": w_email,
-                "theater_id": t_id,
-                "theater_name": t_data["name"],
-                "department": dept,
-                "designation": f"{dept} Specialist",
-                "status": "active",
-                "current_task": "Idle / On Standby" if w_idx > 3 else "Auditorium Sound Calibration",
+                "worker_profile": worker_profile,
                 "created_at": datetime.now(UTC).replace(tzinfo=None)
             })
 
             if w_idx <= 2:
                 db.tasks.insert_one({
                     "theater_id": t_id,
-                    "assigned_worker_id": w_doc_res.inserted_id,
+                    "assigned_worker_id": worker_u.inserted_id,
                     "worker_name": f"Field Worker {w_idx}",
                     "title": f"Sanitize & inspect Screen {w_idx} seats",
                     "description": "Clean cup holders, inspect row lighting, and ensure emergency exit clear.",
