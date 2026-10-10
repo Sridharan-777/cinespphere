@@ -1,20 +1,24 @@
 const { spawn } = require('child_process');
-const http = require('http');
+const path = require('path');
 
-console.log('[Runner] Starting CineSphere Flask application on port 3000...');
+const projectRoot = __dirname;
+const defaultPython = process.platform === 'win32'
+  ? path.join(projectRoot, 'venv', 'Scripts', 'python.exe')
+  : 'python3';
+const python = process.env.PYTHON_BIN || defaultPython;
+const port = process.env.PORT || '3000';
 
-function startFlask() {
-  const env = { ...process.env, PORT: '3000', PYTHONPATH: '/app/applet' };
-  const flask = spawn('python3', ['/app/applet/cinesphere/run.py'], {
-    env,
-    stdio: 'inherit',
-    cwd: '/app/applet'
-  });
+console.log(`[Runner] Starting CineSphere Flask application on port ${port}...`);
 
-  flask.on('close', (code) => {
-    console.log(`[Runner] CineSphere process exited with code ${code}. Restarting in 1s...`);
-    setTimeout(startFlask, 1000);
-  });
-}
+const flask = spawn(python, ['-m', 'cinesphere.run'], {
+  env: { ...process.env, PORT: port, PYTHONPATH: projectRoot },
+  stdio: 'inherit',
+  cwd: projectRoot
+});
 
-startFlask();
+flask.on('error', error => {
+  console.error(`[Runner] Unable to start Python at ${python}: ${error.message}`);
+  process.exit(1);
+});
+
+flask.on('close', code => process.exit(code ?? 1));

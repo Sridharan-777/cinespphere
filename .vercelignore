@@ -1,0 +1,11 @@
+venv/
+.git/
+.env
+.env.*
+!.env.example
+app/
+gradle/
+output/
+tmp/
+**/__pycache__/
+**/*.pyc

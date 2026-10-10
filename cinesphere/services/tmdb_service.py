@@ -17,7 +17,7 @@ LANGUAGE_NAMES = {
 
 class TMDBService:
     def __init__(self, api_key=None):
-        self.api_key = api_key or os.getenv('TMDB_API_KEY', '8265bd1679663a7ea12ac168da84d2e8')
+        self.api_key = api_key or os.getenv('TMDB_API_KEY', '')
         self.base_url = 'https://api.themoviedb.org/3'
         self.image_base_url = 'https://image.tmdb.org/t/p'
 

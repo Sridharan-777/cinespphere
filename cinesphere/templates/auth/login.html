@@ -31,6 +31,7 @@
                 Sign In with Email
             </button>
 
+            {% if config.GOOGLE_CLIENT_ID and config.GOOGLE_CLIENT_SECRET %}
             <div style="display: flex; align-items: center; text-align: center; margin: 1rem 0;">
                 <hr style="flex-grow: 1; border: none; border-top: 1px solid var(--border);">
                 <span style="padding: 0 10px; color: var(--text-muted); font-size: 0.85rem;">or</span>
@@ -41,6 +42,7 @@
                 <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google" style="width: 20px; height: 20px;">
                 Sign in with Google
             </a>
+            {% endif %}
         </form>
 
         <div style="margin-top: 1.5rem; text-align: center; font-size: 0.88rem; color: var(--text-muted);">

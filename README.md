@@ -1,20 +1,27 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# CineSphere
 
-# Run and deploy your AI Studio app
+CineSphere is a Flask and MongoDB movie-theater management and ticket-booking application with customer, worker, staff, and administrator portals.
 
-This contains everything you need to run your app locally.
+## Run locally
 
-View your app in AI Studio: https://ai.studio/apps/cc59b85f-c76c-49d0-aa48-3413b74e1458
+Requirements: Python 3.11+ and MongoDB.
 
-## Run Locally
+1. Create and activate a virtual environment.
+2. Install dependencies with `pip install -r requirements.txt`.
+3. Copy `.env.example` to `.env` and configure the required values.
+4. Seed the database with `python -m cinesphere.scripts.seed_database` when using a new database.
+5. Start the app with `python -m cinesphere.run`.
 
-**Prerequisites:**  Node.js
+The local application listens on `http://localhost:3000` by default. Set `PORT` to use another port.
 
+## Deploy to Vercel
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+The repository includes a Python serverless entrypoint and Vercel routing configuration. Configure these Production environment variables before deploying:
+
+- `SECRET_KEY` - a long, randomly generated Flask session secret
+- `MONGO_URI` - a MongoDB Atlas connection string accessible from Vercel
+- `DATABASE_NAME` - defaults to `cinesphere`
+
+Optional integrations use `TMDB_API_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `STRIPE_PUBLIC_KEY`, and `STRIPE_SECRET_KEY`.
+
+After linking the intended Vercel project, deploy with `vercel --prod`.

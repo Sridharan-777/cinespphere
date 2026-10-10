@@ -7,13 +7,18 @@ from cinesphere.models.database import init_db, get_db
 
 def create_app(config_name=None):
     if not config_name:
-        config_name = os.getenv("FLASK_ENV", "development")
+        config_name = os.getenv("FLASK_ENV", "production" if os.getenv("VERCEL") else "development")
 
     app = Flask(__name__,
                 template_folder="templates",
                 static_folder="static")
     
     app.config.from_object(config_by_name.get(config_name, config_by_name["default"]))
+
+    if config_name == "production":
+        missing = [name for name in ("SECRET_KEY", "MONGO_URI") if not app.config.get(name)]
+        if missing:
+            raise RuntimeError(f"Missing required production environment variables: {', '.join(missing)}")
 
     # Initialize MongoDB
     init_db(app)

@@ -15,4 +15,11 @@
 .cxx
 local.properties
 .env
+.env.*
+!.env.example
+.vercel/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
 debug.keystore

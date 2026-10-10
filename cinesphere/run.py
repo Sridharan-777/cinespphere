@@ -9,6 +9,6 @@ from cinesphere.app import create_app
 app = create_app()
 
 if __name__ == '__main__':
-    port = 3000
+    port = int(os.getenv("PORT", "3000"))
     print(f'Starting CineSphere on port {port}...')
     app.run(host='0.0.0.0', port=port, debug=False)

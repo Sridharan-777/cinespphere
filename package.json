@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "build": "echo 'Build successful' && exit 0"
+    "build": "node -e \"JSON.parse(require('fs').readFileSync('vercel.json', 'utf8')); console.log('Vercel configuration valid')\"",
+    "test": "venv\\Scripts\\python.exe -m unittest discover -s cinesphere\\tests -q"
   },
   "dependencies": {}
 }

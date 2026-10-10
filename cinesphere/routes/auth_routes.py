@@ -1,5 +1,6 @@
 ﻿from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from bson import ObjectId
+from flask import current_app
 from cinesphere.models.user_model import UserModel
 from cinesphere.models.database import get_db
 from cinesphere.utils.audit import log_audit
@@ -72,6 +73,9 @@ def login():
 
 @auth_bp.route("/login/google")
 def google_login():
+    if not current_app.config.get("GOOGLE_CLIENT_ID") or not current_app.config.get("GOOGLE_CLIENT_SECRET"):
+        flash("Google sign-in is not configured. Use email and password instead.", "warning")
+        return redirect(url_for("auth.login"))
     redirect_uri = url_for("auth.google_callback", _external=True)
     return oauth.google.authorize_redirect(redirect_uri)
 
