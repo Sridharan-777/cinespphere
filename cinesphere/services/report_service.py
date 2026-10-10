@@ -1,4 +1,4 @@
-from datetime import datetime, date
+﻿from datetime import UTC, datetime, date
 from bson import ObjectId
 from cinesphere.models.database import get_db
 
@@ -9,7 +9,7 @@ class ReportService:
         t_id = ObjectId(theater_id)
         
         # Today's date string YYYY-MM-DD
-        today_str = datetime.utcnow().strftime("%Y-%m-%d")
+        today_str = datetime.now(UTC).replace(tzinfo=None).strftime("%Y-%m-%d")
         
         # Revenue and bookings count
         bookings = list(db.bookings.find({"theater_id": t_id}))
@@ -48,7 +48,7 @@ class ReportService:
     @staticmethod
     def get_global_admin_stats():
         db = get_db()
-        today_str = datetime.utcnow().strftime("%Y-%m-%d")
+        today_str = datetime.now(UTC).replace(tzinfo=None).strftime("%Y-%m-%d")
         
         bookings = list(db.bookings.find())
         total_revenue = sum(b.get("pricing", {}).get("grand_total", 0) for b in bookings if b.get("status") == "Confirmed")

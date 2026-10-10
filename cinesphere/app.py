@@ -1,5 +1,5 @@
-import os
-from datetime import datetime
+﻿import os
+from datetime import UTC, datetime
 from bson import ObjectId
 from flask import Flask, render_template, session, request
 from cinesphere.config import config_by_name
@@ -61,7 +61,7 @@ def create_app(config_name=None):
         try:
             get_db().user_sessions.update_one(
                 {"_id": ObjectId(record_id), "status": "active"},
-                {"$set": {"last_seen_at": datetime.utcnow()}},
+                {"$set": {"last_seen_at": datetime.now(UTC).replace(tzinfo=None)}},
             )
         except Exception:
             pass

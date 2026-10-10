@@ -1,5 +1,5 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session
-from datetime import datetime
+﻿from flask import Blueprint, render_template, request, redirect, url_for, flash, session
+from datetime import UTC, datetime
 from bson import ObjectId
 from cinesphere.models.database import get_db
 from cinesphere.utils.decorators import role_required
@@ -21,7 +21,7 @@ def dashboard():
     tasks = list(db.tasks.find({"assigned_worker_id": worker["_id"]}).sort("created_at", -1))
     
     # Today attendance
-    today_str = datetime.utcnow().strftime("%Y-%m-%d")
+    today_str = datetime.now(UTC).replace(tzinfo=None).strftime("%Y-%m-%d")
     attendance = db.attendance.find_one({"worker_id": worker["_id"], "date": today_str})
 
     # Footfall & approaching customers statistics
@@ -40,7 +40,7 @@ def dashboard():
         "active_shows": active_shows
     }
 
-    month_key = datetime.utcnow().strftime("%Y-%m")
+    month_key = datetime.now(UTC).replace(tzinfo=None).strftime("%Y-%m")
     benefit_bookings = list(db.bookings.find({
         "customer_id": uid,
         "employee_benefit.month": month_key,
@@ -96,7 +96,7 @@ def update_task_status(task_id):
     if notes:
         update_fields["notes"] = notes
     if new_status == "Completed":
-        update_fields["completed_at"] = datetime.utcnow()
+        update_fields["completed_at"] = datetime.now(UTC).replace(tzinfo=None)
         # Clear current task in worker record
         db.workers.update_one({"_id": worker["_id"]}, {"$set": {"current_task": "Available / Standby"}})
     elif new_status == "In Progress":
@@ -113,7 +113,7 @@ def attendance():
     db = get_db()
     uid = ObjectId(session["user_id"])
     worker = db.workers.find_one({"user_id": uid})
-    today_str = datetime.utcnow().strftime("%Y-%m-%d")
+    today_str = datetime.now(UTC).replace(tzinfo=None).strftime("%Y-%m-%d")
 
     if request.method == "POST":
         action = request.form.get("action") # check_in or check_out
@@ -126,10 +126,10 @@ def attendance():
                     "worker_name": worker["name"],
                     "theater_id": worker["theater_id"],
                     "date": today_str,
-                    "check_in": datetime.utcnow().strftime("%I:%M %p"),
+                    "check_in": datetime.now(UTC).replace(tzinfo=None).strftime("%I:%M %p"),
                     "check_out": None,
                     "status": "Present",
-                    "created_at": datetime.utcnow()
+                    "created_at": datetime.now(UTC).replace(tzinfo=None)
                 })
                 flash("Attendance recorded: Shift check-in successful!", "success")
             else:
@@ -139,7 +139,7 @@ def attendance():
             if existing:
                 db.attendance.update_one(
                     {"_id": existing["_id"]},
-                    {"$set": {"check_out": datetime.utcnow().strftime("%I:%M %p")}}
+                    {"$set": {"check_out": datetime.now(UTC).replace(tzinfo=None).strftime("%I:%M %p")}}
                 )
                 flash("Checked out from shift successfully!", "success")
             else:

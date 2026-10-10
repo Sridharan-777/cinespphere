@@ -1,4 +1,4 @@
-from datetime import datetime
+﻿from datetime import UTC, datetime
 from bson import ObjectId
 from werkzeug.security import generate_password_hash, check_password_hash
 from cinesphere.models.database import get_db
@@ -21,8 +21,8 @@ class UserModel:
             "google_id": google_id,
             "status": "active", # active, inactive
             "profile_image": None,
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow(),
+            "created_at": datetime.now(UTC).replace(tzinfo=None),
+            "updated_at": datetime.now(UTC).replace(tzinfo=None),
             "last_login": None
         }
         res = db.users.insert_one(user_doc)
@@ -40,5 +40,5 @@ class UserModel:
             return None, "Your account is deactivated. Please contact support."
         
         # Update last login
-        db.users.update_one({"_id": user["_id"]}, {"$set": {"last_login": datetime.utcnow()}})
+        db.users.update_one({"_id": user["_id"]}, {"$set": {"last_login": datetime.now(UTC).replace(tzinfo=None)}})
         return user, None

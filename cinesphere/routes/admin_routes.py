@@ -1,5 +1,5 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
-from datetime import datetime
+﻿from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
+from datetime import UTC, datetime
 from bson import ObjectId
 from werkzeug.security import generate_password_hash
 from cinesphere.models.database import get_db
@@ -52,7 +52,7 @@ def theaters():
             "staff_capacity": 5,
             "worker_capacity": 20,
             "status": "active",
-            "created_at": datetime.utcnow()
+            "created_at": datetime.now(UTC).replace(tzinfo=None)
         }
         res = db.theaters.insert_one(theater_doc)
 
@@ -65,7 +65,7 @@ def theaters():
                 "screen_type": "IMAX" if i == 1 else "Standard",
                 "capacity": 48,
                 "status": "active",
-                "created_at": datetime.utcnow()
+                "created_at": datetime.now(UTC).replace(tzinfo=None)
             })
 
         log_audit("ADMIN_CREATE_THEATER", "theater", res.inserted_id, f"Admin created theater {name}")
@@ -96,7 +96,7 @@ def edit_theater(theater_id):
         "city": request.form.get("city", "").strip(),
         "phone": request.form.get("phone", "").strip(),
         "email": request.form.get("email", "").strip(),
-        "updated_at": datetime.utcnow()
+        "updated_at": datetime.now(UTC).replace(tzinfo=None)
     }
     if not updates["name"] or not updates["address"] or not updates["city"]:
         flash("Name, address, and city are required.", "danger")
@@ -194,7 +194,7 @@ def staff_management():
             "password_hash": generate_password_hash(password),
             "role": "staff",
             "status": "active",
-            "created_at": datetime.utcnow()
+            "created_at": datetime.now(UTC).replace(tzinfo=None)
         })
 
         db.staff.insert_one({
@@ -207,7 +207,7 @@ def staff_management():
             "theater_name": theater["name"] if theater else "CineSphere",
             "designation": designation,
             "status": "active",
-            "created_at": datetime.utcnow()
+            "created_at": datetime.now(UTC).replace(tzinfo=None)
         })
 
         log_audit("ADMIN_CREATE_STAFF", "staff", u_res.inserted_id, f"Admin added staff {name} to {theater['name'] if theater else ''}")
@@ -268,7 +268,7 @@ def sync_tmdb_movies():
             if existing:
                 db.movies.update_one({"tmdb_id": tmdb_id}, {"$set": formatted})
             else:
-                formatted["created_at"] = datetime.utcnow()
+                formatted["created_at"] = datetime.now(UTC).replace(tzinfo=None)
                 db.movies.insert_one(formatted)
             count_synced += 1
 

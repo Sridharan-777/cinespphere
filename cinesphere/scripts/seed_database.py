@@ -1,6 +1,6 @@
-import os
+﻿import os
 import sys
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from werkzeug.security import generate_password_hash
 
 # Ensure import path
@@ -40,7 +40,7 @@ def seed_database():
         "password_hash": default_password,
         "role": "admin",
         "status": "active",
-        "created_at": datetime.utcnow()
+        "created_at": datetime.now(UTC).replace(tzinfo=None)
     })
     print(f"Created Admin: admin@cinesphere.com")
 
@@ -56,7 +56,7 @@ def seed_database():
             "staff_capacity": 5,
             "worker_capacity": 20,
             "status": "active",
-            "created_at": datetime.utcnow()
+            "created_at": datetime.now(UTC).replace(tzinfo=None)
         },
         {
             "name": "CineSphere Hyderabad Banjara",
@@ -68,7 +68,7 @@ def seed_database():
             "staff_capacity": 5,
             "worker_capacity": 20,
             "status": "active",
-            "created_at": datetime.utcnow()
+            "created_at": datetime.now(UTC).replace(tzinfo=None)
         },
         {
             "name": "CineSphere Bengaluru Koramangala",
@@ -80,7 +80,7 @@ def seed_database():
             "staff_capacity": 5,
             "worker_capacity": 20,
             "status": "active",
-            "created_at": datetime.utcnow()
+            "created_at": datetime.now(UTC).replace(tzinfo=None)
         },
         {
             "name": "CineSphere Chennai Express",
@@ -92,7 +92,7 @@ def seed_database():
             "staff_capacity": 5,
             "worker_capacity": 20,
             "status": "active",
-            "created_at": datetime.utcnow()
+            "created_at": datetime.now(UTC).replace(tzinfo=None)
         }
     ]
 
@@ -115,7 +115,7 @@ def seed_database():
                 "screen_type": s_type,
                 "capacity": 48,
                 "status": "active",
-                "created_at": datetime.utcnow()
+                "created_at": datetime.now(UTC).replace(tzinfo=None)
             })
             screens_by_theater[t_id].append(sc_res.inserted_id)
 
@@ -133,7 +133,7 @@ def seed_database():
                 "password_hash": default_password,
                 "role": "staff",
                 "status": "active",
-                "created_at": datetime.utcnow()
+                "created_at": datetime.now(UTC).replace(tzinfo=None)
             })
 
             db.staff.insert_one({
@@ -145,7 +145,7 @@ def seed_database():
                 "theater_name": t_data["name"],
                 "designation": "Operations Lead" if s_idx == 1 else "Floor Supervisor",
                 "status": "active",
-                "created_at": datetime.utcnow()
+                "created_at": datetime.now(UTC).replace(tzinfo=None)
             })
 
         # SEED EXACTLY 20 FIELD WORKERS FOR EACH THEATER (Quota Enforcement)
@@ -166,7 +166,7 @@ def seed_database():
                 "password_hash": default_password,
                 "role": "worker",
                 "status": "active",
-                "created_at": datetime.utcnow()
+                "created_at": datetime.now(UTC).replace(tzinfo=None)
             })
 
             w_doc_res = db.workers.insert_one({
@@ -180,7 +180,7 @@ def seed_database():
                 "designation": f"{dept} Specialist",
                 "status": "active",
                 "current_task": "Idle / On Standby" if w_idx > 3 else "Auditorium Sound Calibration",
-                "created_at": datetime.utcnow()
+                "created_at": datetime.now(UTC).replace(tzinfo=None)
             })
 
             if w_idx <= 2:
@@ -193,7 +193,7 @@ def seed_database():
                     "priority": "High" if w_idx == 1 else "Medium",
                     "status": "In Progress" if w_idx == 1 else "Pending",
                     "created_by": "Floor Supervisor",
-                    "created_at": datetime.utcnow(),
+                    "created_at": datetime.now(UTC).replace(tzinfo=None),
                     "notes": "Shift task dispatched."
                 })
 
@@ -210,7 +210,7 @@ def seed_database():
             "password_hash": default_password,
             "role": "customer",
             "status": "active",
-            "created_at": datetime.utcnow()
+            "created_at": datetime.now(UTC).replace(tzinfo=None)
         })
         cust_profile = db.customers.insert_one({
             "user_id": c_user.inserted_id,
@@ -222,7 +222,7 @@ def seed_database():
             "total_bookings": 0,
             "total_spent": 0,
             "status": "active",
-            "created_at": datetime.utcnow()
+            "created_at": datetime.now(UTC).replace(tzinfo=None)
         })
         customer_ids.append((c_user.inserted_id, cust_profile.inserted_id))
 
@@ -287,7 +287,7 @@ def seed_database():
                 else:
                     formatted["status"] = "Now Showing"
 
-                formatted["created_at"] = datetime.utcnow()
+                formatted["created_at"] = datetime.now(UTC).replace(tzinfo=None)
                 m_res = db.movies.insert_one(formatted)
                 formatted["_id"] = m_res.inserted_id
                 synced_movies.append(formatted)
@@ -298,10 +298,10 @@ def seed_database():
     if not synced_movies:
         print("TMDB API failed. Using fallback mock movies...")
         mock_movies = [
-            {"title": "The Galactic Journey", "language": "English", "genres": ["Sci-Fi", "Adventure"], "status": "Now Showing", "rating": 4.8, "created_at": datetime.utcnow(), "poster_path": None, "overview": "A journey through the stars."},
-            {"title": "Mystery of the Old Manor", "language": "English", "genres": ["Mystery", "Thriller"], "status": "Now Showing", "rating": 4.5, "created_at": datetime.utcnow(), "poster_path": None, "overview": "A gripping mystery."},
-            {"title": "Comedy Nights", "language": "English", "genres": ["Comedy"], "status": "Now Showing", "rating": 4.2, "created_at": datetime.utcnow(), "poster_path": None, "overview": "Laugh out loud."},
-            {"title": "Action Hero", "language": "English", "genres": ["Action"], "status": "Now Showing", "rating": 4.6, "created_at": datetime.utcnow(), "poster_path": None, "overview": "Explosions and fights."}
+            {"title": "The Galactic Journey", "language": "English", "genres": ["Sci-Fi", "Adventure"], "status": "Now Showing", "rating": 4.8, "created_at": datetime.now(UTC).replace(tzinfo=None), "poster_path": None, "overview": "A journey through the stars."},
+            {"title": "Mystery of the Old Manor", "language": "English", "genres": ["Mystery", "Thriller"], "status": "Now Showing", "rating": 4.5, "created_at": datetime.now(UTC).replace(tzinfo=None), "poster_path": None, "overview": "A gripping mystery."},
+            {"title": "Comedy Nights", "language": "English", "genres": ["Comedy"], "status": "Now Showing", "rating": 4.2, "created_at": datetime.now(UTC).replace(tzinfo=None), "poster_path": None, "overview": "Laugh out loud."},
+            {"title": "Action Hero", "language": "English", "genres": ["Action"], "status": "Now Showing", "rating": 4.6, "created_at": datetime.now(UTC).replace(tzinfo=None), "poster_path": None, "overview": "Explosions and fights."}
         ]
         for m in mock_movies:
             m_res = db.movies.insert_one(m)
@@ -340,7 +340,7 @@ def seed_database():
                         "base_price": price,
                         "booked_seats": ["A1", "A2", "D4"],
                         "status": "active",
-                        "created_at": datetime.utcnow()
+                        "created_at": datetime.now(UTC).replace(tzinfo=None)
                     })
 
     # 6. SEED REVIEWS
@@ -354,7 +354,7 @@ def seed_database():
             "title": f"Phenomenal theatrical showcase for {m['title']}!",
             "comment": f"High energy cinema! The sound mix in {m['language']} along with the visual fidelity was sheer perfection on the big screen.",
             "status": "Published",
-            "created_at": datetime.utcnow()
+            "created_at": datetime.now(UTC).replace(tzinfo=None)
         })
         db.reviews.insert_one({
             "movie_id": m["_id"],
@@ -365,10 +365,10 @@ def seed_database():
             "title": "Loved the acting and pacing",
             "comment": "Incredible screenplay and direction. A must watch with family in IMAX.",
             "status": "Published",
-            "created_at": datetime.utcnow()
+            "created_at": datetime.now(UTC).replace(tzinfo=None)
         })
 
-    print("✅ CineSphere database seed successfully completed!")
+    print("âœ… CineSphere database seed successfully completed!")
     print(f"Summary: Admin created | 4 Theaters | {len(synced_movies)} Real Movies across South Indian (Telugu, Tamil, Malayalam, Kannada) & Global genres.")
 
 if __name__ == "__main__":

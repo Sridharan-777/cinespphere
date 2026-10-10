@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session
+﻿from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from bson import ObjectId
 from cinesphere.models.user_model import UserModel
 from cinesphere.models.database import get_db
@@ -49,8 +49,8 @@ def login():
                 session["theater_id"] = str(worker_doc["theater_id"])
                 session["theater_name"] = worker_doc.get("theater_name", "")
 
-        from datetime import datetime
-        db.users.update_one({"_id": user["_id"]}, {"$set": {"last_login": datetime.utcnow()}})
+        from datetime import UTC, datetime
+        db.users.update_one({"_id": user["_id"]}, {"$set": {"last_login": datetime.now(UTC).replace(tzinfo=None)}})
         start_user_session(user, "password")
 
         log_audit("LOGIN", "user", user["_id"], f"User {user['email']} logged in as {user['role']}")
@@ -121,8 +121,8 @@ def google_callback():
     session["email"] = user["email"]
     session["role"] = user["role"]
     
-    from datetime import datetime
-    db.users.update_one({"_id": user["_id"]}, {"$set": {"last_login": datetime.utcnow()}})
+    from datetime import UTC, datetime
+    db.users.update_one({"_id": user["_id"]}, {"$set": {"last_login": datetime.now(UTC).replace(tzinfo=None)}})
     start_user_session(user, "google")
     
     log_audit("LOGIN", "user", user["_id"], f"User {email} logged in via Google")
@@ -182,9 +182,9 @@ def register():
 def logout():
     uid = session.get("user_id")
     if uid:
-        from datetime import datetime
+        from datetime import UTC, datetime
         db = get_db()
-        db.users.update_one({"_id": ObjectId(uid)}, {"$set": {"last_logout": datetime.utcnow()}})
+        db.users.update_one({"_id": ObjectId(uid)}, {"$set": {"last_logout": datetime.now(UTC).replace(tzinfo=None)}})
         close_user_session()
         log_audit("LOGOUT", "user", uid, f"User {session.get('email')} logged out")
     session.clear()

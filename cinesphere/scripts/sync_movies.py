@@ -1,4 +1,4 @@
-from datetime import datetime
+﻿from datetime import UTC, datetime
 from cinesphere.models.database import get_db
 from cinesphere.services.tmdb_service import tmdb_service
 
@@ -23,7 +23,7 @@ def sync_movies():
         if existing:
             db.movies.update_one({"tmdb_id": tmdb_id}, {"$set": formatted})
         else:
-            formatted["created_at"] = datetime.utcnow()
+            formatted["created_at"] = datetime.now(UTC).replace(tzinfo=None)
             db.movies.insert_one(formatted)
         synced += 1
 

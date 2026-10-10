@@ -859,6 +859,43 @@ body.light-mode {
 .crud-form-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:1rem; }
 .payment-status-note { max-width:260px; color:var(--text-muted); font-size:.78rem; line-height:1.4; }
 
+/* Template-safe state styling: dynamic values stay in HTML classes/attributes. */
+.badge-success { background: rgba(34,197,94,.2); color: #86efac; }
+.badge-danger { background: rgba(239,68,68,.2); color: #fca5a5; }
+.badge-warning { background: rgba(245,158,11,.2); color: #fcd34d; }
+.badge-info { background: rgba(37,99,235,.2); color: #93c5fd; }
+.badge-muted { background: rgba(107,114,128,.2); color: #d1d5db; }
+.tier-value, .report-task-value { font-size: 1.7rem; }
+.tier-pro { color: var(--primary); }
+.tier-plus { color: #60a5fa; }
+.tier-free { color: #a1a1aa; }
+.text-warning { color: var(--warning); }
+.text-success { color: var(--success); }
+.notification-card { background: var(--bg-card); border-left: 4px solid var(--info); border-radius: 8px; padding: 1.2rem; }
+.notification-success { border-left-color: var(--success); }
+.notification-warning { border-left-color: var(--warning); }
+.notification-info { border-left-color: var(--info); }
+.worker-task-card { background: var(--bg-card); border: 1px solid var(--border); border-left: 5px solid var(--warning); border-radius: 10px; padding: 1.5rem; }
+.worker-task-card.task-completed { border-left-color: var(--success); }
+.worker-task-card.task-in-progress { border-left-color: #3b82f6; }
+.worker-task-card.task-pending { border-left-color: var(--warning); }
+.capacity-progress, .rewards-progress, .rating-progress { display: block; width: 100%; border: 0; overflow: hidden; background: var(--bg-secondary); }
+.capacity-progress { height: 10px; border-radius: 5px; }
+.rewards-progress, .rating-progress { height: 100%; border-radius: inherit; }
+.capacity-progress::-webkit-progress-bar, .rewards-progress::-webkit-progress-bar, .rating-progress::-webkit-progress-bar { background: var(--bg-secondary); }
+.capacity-progress::-webkit-progress-value { background: var(--accent); }
+.capacity-progress-staff::-webkit-progress-value { background: #2563eb; }
+.capacity-progress-worker::-webkit-progress-value { background: #d97706; }
+.capacity-progress-full::-webkit-progress-value { background: var(--danger); }
+.rewards-progress::-webkit-progress-value { background: linear-gradient(90deg, var(--primary), var(--accent)); }
+.rating-progress::-webkit-progress-value { background: var(--accent); }
+.capacity-progress::-moz-progress-bar { background: var(--accent); }
+.capacity-progress-staff::-moz-progress-bar { background: #2563eb; }
+.capacity-progress-worker::-moz-progress-bar { background: #d97706; }
+.capacity-progress-full::-moz-progress-bar { background: var(--danger); }
+.rewards-progress::-moz-progress-bar { background: linear-gradient(90deg, var(--primary), var(--accent)); }
+.rating-progress::-moz-progress-bar { background: var(--accent); }
+
 .flash-messages-container { position: fixed; top: 96px; right: 18px; width: min(420px, calc(100% - 36px)); z-index: 1100; padding: 0; }
 .flash-alert { border-radius: 16px; backdrop-filter: blur(22px); box-shadow: var(--glass-shadow); }
 .footer { margin: 2rem 12px 12px; border: 1px solid var(--border); border-radius: 28px; background: var(--bg-secondary); backdrop-filter: blur(26px); }

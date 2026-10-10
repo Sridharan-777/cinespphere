@@ -1,4 +1,4 @@
-from datetime import datetime
+﻿from datetime import UTC, datetime
 from flask import request, session
 from cinesphere.models.database import get_db
 
@@ -19,7 +19,7 @@ def log_audit(action, entity, entity_id=None, description=""):
             "entity_id": str(entity_id) if entity_id else None,
             "description": description,
             "ip_address": ip,
-            "created_at": datetime.utcnow()
+            "created_at": datetime.now(UTC).replace(tzinfo=None)
         }
         db.audit_logs.insert_one(audit_entry)
     except Exception as e:
@@ -34,7 +34,7 @@ def create_notification(user_id, title, message, notif_type="info"):
             "message": message,
             "type": notif_type, # info, success, warning, alert
             "is_read": False,
-            "created_at": datetime.utcnow()
+            "created_at": datetime.now(UTC).replace(tzinfo=None)
         })
     except Exception as e:
         print(f"Failed to create notification: {e}")

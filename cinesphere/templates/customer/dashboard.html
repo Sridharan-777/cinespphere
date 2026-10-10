@@ -32,7 +32,7 @@
     <div class="dashboard-grid">
         <div class="stat-card">
             <div class="stat-title">Membership Tier</div>
-            <div class="stat-value" style="color: {% if stats.tier == 'Pro' %}var(--primary){% elif stats.tier == 'Plus' %}#60a5fa{% else %}#a1a1aa{% endif %}; font-size: 1.7rem;">
+        <div class="stat-value tier-value {% if stats.tier == 'Pro' %}tier-pro{% elif stats.tier == 'Plus' %}tier-plus{% else %}tier-free{% endif %}">
                 {{ stats.tier }}
             </div>
             <a href="{{ url_for('customer.plans') }}" style="font-size: 0.8rem; color: var(--accent); text-decoration: underline;">View Plan Privileges</a>

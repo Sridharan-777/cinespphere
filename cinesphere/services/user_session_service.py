@@ -1,4 +1,4 @@
-from datetime import datetime
+﻿from datetime import UTC, datetime
 from bson import ObjectId
 from flask import request, session
 from cinesphere.models.database import get_db
@@ -6,7 +6,7 @@ from cinesphere.models.database import get_db
 
 def start_user_session(user, login_method="password"):
     """Create one auditable record for this login and link it to Flask's session."""
-    now = datetime.utcnow()
+    now = datetime.now(UTC).replace(tzinfo=None)
     user_agent = request.headers.get("User-Agent", "Unknown")[:500]
     forwarded_for = request.headers.get("X-Forwarded-For", "")
     ip_address = forwarded_for.split(",")[0].strip() if forwarded_for else (request.remote_addr or "Unknown")
@@ -35,7 +35,7 @@ def close_user_session():
         object_id = ObjectId(record_id)
     except Exception:
         return
-    now = datetime.utcnow()
+    now = datetime.now(UTC).replace(tzinfo=None)
     get_db().user_sessions.update_one(
         {"_id": object_id, "status": "active"},
         {"$set": {"logout_at": now, "last_seen_at": now, "status": "logged_out"}},

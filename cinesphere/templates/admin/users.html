@@ -36,7 +36,7 @@
                     <td>{{ u.email }}</td>
                     <td><span class="role-tag role-{{ u.role }}">{{ u.role }}</span></td>
                     <td>
-                        <span class="badge" style="background: {% if u.status == 'active' %}rgba(34, 197, 94, 0.2); color: #86efac;{% else %}rgba(239, 68, 68, 0.2); color: #fca5a5;{% endif %}">
+                        <span class="badge {% if u.status == 'active' %}badge-success{% else %}badge-danger{% endif %}">
                             {{ u.status }}
                         </span>
                     </td>

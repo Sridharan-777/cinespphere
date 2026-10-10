@@ -63,9 +63,7 @@
                     <span>Staff (Max 5):</span>
                     <strong>{{ t.staff_count }} / 5</strong>
                 </div>
-                <div style="height: 6px; background: var(--bg-secondary); border-radius: 3px; overflow: hidden;">
-                    <div style="height: 100%; width: {{ (t.staff_count / 5) * 100 }}%; background: #2563eb;"></div>
-                </div>
+                <progress class="capacity-progress capacity-progress-staff" value="{{ t.staff_count }}" max="5">{{ t.staff_count }} / 5</progress>
             </div>
 
             <div style="margin-bottom: 1.2rem;">
@@ -73,9 +71,7 @@
                     <span>Workers (Max 20):</span>
                     <strong>{{ t.worker_count }} / 20</strong>
                 </div>
-                <div style="height: 6px; background: var(--bg-secondary); border-radius: 3px; overflow: hidden;">
-                    <div style="height: 100%; width: {{ (t.worker_count / 20) * 100 }}%; background: #d97706;"></div>
-                </div>
+                <progress class="capacity-progress capacity-progress-worker" value="{{ t.worker_count }}" max="20">{{ t.worker_count }} / 20</progress>
             </div>
 
             <a href="{{ url_for('admin.theater_details', theater_id=t._id) }}" class="btn btn-sm btn-outline" style="width: 100%;">Inspect Theater</a>

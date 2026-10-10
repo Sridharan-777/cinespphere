@@ -33,7 +33,7 @@
             <td>{{ item.login_at.strftime('%Y-%m-%d %H:%M:%S') if item.login_at else 'Unknown' }}</td>
             <td>{{ item.last_seen_at.strftime('%Y-%m-%d %H:%M:%S') if item.last_seen_at else 'Unknown' }}</td>
             <td>{{ item.logout_at.strftime('%Y-%m-%d %H:%M:%S') if item.logout_at else '—' }}</td>
-            <td><span class="badge" style="color:{% if item.status == 'active' %}#86efac{% else %}var(--text-muted){% endif %};">{{ item.status|replace('_', ' ')|upper }}</span></td>
+            <td><span class="badge {% if item.status == 'active' %}badge-success{% else %}badge-muted{% endif %}">{{ item.status|replace('_', ' ')|upper }}</span></td>
             <td><code>{{ item.ip_address }}</code></td>
             <td>{{ item.login_method|title }}<br><small title="{{ item.user_agent }}" style="color:var(--text-muted);">{{ item.user_agent|truncate(45) }}</small></td>
         </tr>

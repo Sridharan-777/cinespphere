@@ -1,5 +1,5 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, abort
-from datetime import datetime
+﻿from flask import Blueprint, render_template, request, redirect, url_for, flash, session, abort
+from datetime import UTC, datetime
 from bson import ObjectId
 from werkzeug.security import generate_password_hash
 from cinesphere.models.database import get_db
@@ -26,7 +26,7 @@ def dashboard():
     stats = ReportService.get_theater_stats(theater_id)
 
     # Active shows today
-    today_str = datetime.utcnow().strftime("%Y-%m-%d")
+    today_str = datetime.now(UTC).replace(tzinfo=None).strftime("%Y-%m-%d")
     today_shows = list(db.showtimes.find({"theater_id": theater_id, "show_date": today_str}).sort("start_time", 1))
     for s in today_shows:
         movie = db.movies.find_one({"_id": s["movie_id"]})
@@ -166,7 +166,7 @@ def worker_create():
             "password_hash": generate_password_hash("Worker@1234"),
             "role": "worker",
             "status": "active",
-            "created_at": datetime.utcnow()
+            "created_at": datetime.now(UTC).replace(tzinfo=None)
         })
 
         db.workers.insert_one({
@@ -183,7 +183,7 @@ def worker_create():
             "shift_timings": shift,
             "status": "active",
             "current_task": "Idle / On Call",
-            "created_at": datetime.utcnow()
+            "created_at": datetime.now(UTC).replace(tzinfo=None)
         })
 
         log_audit("STAFF_CREATE_WORKER", "worker", user_res.inserted_id, f"Staff created worker {name} in {department}")
@@ -253,7 +253,7 @@ def show_create():
             "base_price": base_price,
             "booked_seats": [],
             "status": "active",
-            "created_at": datetime.utcnow()
+            "created_at": datetime.now(UTC).replace(tzinfo=None)
         })
 
         movie = db.movies.find_one({"_id": movie_id})
@@ -298,7 +298,7 @@ def tasks():
             "status": "Pending",
             "created_by": staff["name"],
             "notes": "",
-            "created_at": datetime.utcnow()
+            "created_at": datetime.now(UTC).replace(tzinfo=None)
         })
 
         db.workers.update_one({"_id": worker_id}, {"$set": {"current_task": title}})

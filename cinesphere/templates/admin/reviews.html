@@ -39,7 +39,7 @@
                         {% endif %}
                     </td>
                     <td>
-                        <span class="badge" style="background: {% if r.status == 'Published' %}rgba(34, 197, 94, 0.2); color: #86efac;{% elif r.status == 'Rejected' %}rgba(239, 68, 68, 0.2); color: #fca5a5;{% else %}rgba(245, 158, 11, 0.2); color: #fcd34d;{% endif %}">
+                        <span class="badge {% if r.status == 'Published' %}badge-success{% elif r.status == 'Rejected' %}badge-danger{% else %}badge-warning{% endif %}">
                             {{ r.status }}
                         </span>
                     </td>

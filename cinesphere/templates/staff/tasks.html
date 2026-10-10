@@ -71,12 +71,12 @@
                     </td>
                     <td>{{ t.worker_name }}</td>
                     <td>
-                        <span class="badge" style="background: {% if t.priority == 'Critical' %}rgba(239, 68, 68, 0.2); color: #fca5a5;{% elif t.priority == 'High' %}rgba(245, 158, 11, 0.2); color: #fcd34d;{% else %}rgba(59, 130, 246, 0.2); color: #93c5fd;{% endif %}">
+                        <span class="badge {% if t.priority == 'Critical' %}badge-danger{% elif t.priority == 'High' %}badge-warning{% else %}badge-info{% endif %}">
                             {{ t.priority }}
                         </span>
                     </td>
                     <td>
-                        <span class="badge" style="background: {% if t.status == 'Completed' %}rgba(34, 197, 94, 0.2); color: #86efac;{% elif t.status == 'In Progress' %}rgba(37, 99, 235, 0.2); color: #93c5fd;{% else %}rgba(107, 114, 128, 0.2); color: #d1d5db;{% endif %}">
+                        <span class="badge {% if t.status == 'Completed' %}badge-success{% elif t.status == 'In Progress' %}badge-info{% else %}badge-muted{% endif %}">
                             {{ t.status }}
                         </span>
                     </td>

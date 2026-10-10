@@ -1,5 +1,5 @@
-import uuid
-from datetime import datetime
+﻿import uuid
+from datetime import UTC, datetime
 from bson import ObjectId
 from cinesphere.models.database import get_db
 
@@ -109,7 +109,7 @@ class BookingService:
             "amount": pricing["grand_total"],
             "payment_method": payment_method,
             "status": "Successful",
-            "created_at": datetime.utcnow(),
+            "created_at": datetime.now(UTC).replace(tzinfo=None),
             "gateway": {
                 "provider": payment_method,
                 "currency": "INR",
@@ -158,7 +158,7 @@ class BookingService:
             "payment_id": pay_res.inserted_id,
             "transaction_id": transaction_id,
             "status": "Confirmed", # Confirmed, Cancelled, Completed
-            "created_at": datetime.utcnow()
+            "created_at": datetime.now(UTC).replace(tzinfo=None)
         }
         if booking_metadata:
             booking_doc.update(booking_metadata)
@@ -175,7 +175,7 @@ class BookingService:
             {"user_id": ObjectId(customer_id)},
             {
                 "$inc": {"total_bookings": 1, "total_spent": pricing["grand_total"]},
-                "$set": {"updated_at": datetime.utcnow()}
+                "$set": {"updated_at": datetime.now(UTC).replace(tzinfo=None)}
             }
         )
 

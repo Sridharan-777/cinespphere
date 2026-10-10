@@ -1,4 +1,4 @@
-from datetime import datetime
+﻿from datetime import UTC, datetime
 from bson import ObjectId
 from cinesphere.models.database import get_db
 
@@ -16,8 +16,8 @@ class TheaterModel:
             "staff_capacity": 5,
             "worker_capacity": 20,
             "status": "active",
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow()
+            "created_at": datetime.now(UTC).replace(tzinfo=None),
+            "updated_at": datetime.now(UTC).replace(tzinfo=None)
         }
         res = db.theaters.insert_one(doc)
         doc["_id"] = res.inserted_id

@@ -64,7 +64,7 @@
 
         <div class="stat-card">
             <div class="stat-title">Pending Maintenance Tasks</div>
-            <div class="stat-value" style="font-size: 1.6rem; color: {% if stats.pending_tasks > 0 %}var(--warning){% else %}var(--success){% endif %};">
+            <div class="stat-value report-task-value {% if stats.pending_tasks > 0 %}text-warning{% else %}text-success{% endif %}">
                 {{ stats.pending_tasks }} Active
             </div>
             <span style="font-size: 0.8rem; color: var(--text-muted);">Operational maintenance queue</span>

@@ -1,5 +1,5 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, abort
-from datetime import datetime
+﻿from flask import Blueprint, render_template, request, redirect, url_for, flash, session, abort
+from datetime import UTC, datetime
 from bson import ObjectId
 from werkzeug.security import generate_password_hash
 from cinesphere.models.database import get_db
@@ -27,7 +27,7 @@ def change_plan():
 
     db = get_db()
     uid = ObjectId(session["user_id"])
-    db.customers.update_one({"user_id": uid}, {"$set": {"tier": new_tier, "plan_updated_at": datetime.utcnow()}})
+    db.customers.update_one({"user_id": uid}, {"$set": {"tier": new_tier, "plan_updated_at": datetime.now(UTC).replace(tzinfo=None)}})
     
     log_audit("MEMBERSHIP_TIER_CHANGED", "customer", uid, f"Customer changed membership tier to {new_tier}")
     create_notification(session["user_id"], "Membership Upgraded!", f"Your CineSphere account is now on the {new_tier} tier with exclusive privileges.", "success")
@@ -104,7 +104,7 @@ def cancel_booking(booking_code):
     # Update Booking status
     db.bookings.update_one(
         {"_id": booking["_id"]},
-        {"$set": {"status": "Cancelled", "cancelled_at": datetime.utcnow()}}
+        {"$set": {"status": "Cancelled", "cancelled_at": datetime.now(UTC).replace(tzinfo=None)}}
     )
 
     db.customers.update_one(
@@ -119,7 +119,7 @@ def cancel_booking(booking_code):
     if booking.get("payment_id"):
         db.payments.update_one(
             {"_id": booking["payment_id"]},
-            {"$set": {"status": "Refunded", "refunded_at": datetime.utcnow()}}
+            {"$set": {"status": "Refunded", "refunded_at": datetime.now(UTC).replace(tzinfo=None)}}
         )
 
     log_audit("BOOKING_CANCELLED", "booking", booking["_id"], f"Customer cancelled booking {booking_code}")
@@ -182,7 +182,7 @@ def my_reviews():
         if existing:
             db.reviews.update_one(
                 {"_id": existing["_id"]},
-                {"$set": {"rating": rating, "title": title, "comment": comment, "updated_at": datetime.utcnow()}}
+                {"$set": {"rating": rating, "title": title, "comment": comment, "updated_at": datetime.now(UTC).replace(tzinfo=None)}}
             )
             flash("Your review has been updated.", "success")
         else:
@@ -195,8 +195,8 @@ def my_reviews():
                 "title": title,
                 "comment": comment,
                 "status": "Published",
-                "created_at": datetime.utcnow(),
-                "updated_at": datetime.utcnow()
+                "created_at": datetime.now(UTC).replace(tzinfo=None),
+                "updated_at": datetime.now(UTC).replace(tzinfo=None)
             })
             flash("Your review has been submitted!", "success")
         return redirect(url_for("customer.my_reviews"))
@@ -222,13 +222,13 @@ def profile():
         address = request.form.get("address", "").strip()
         city = request.form.get("city", "").strip()
 
-        db.users.update_one({"_id": uid}, {"$set": {"name": name, "phone": phone, "updated_at": datetime.utcnow()}})
+        db.users.update_one({"_id": uid}, {"$set": {"name": name, "phone": phone, "updated_at": datetime.now(UTC).replace(tzinfo=None)}})
         db.customers.update_one({"user_id": uid}, {"$set": {
             "name": name,
             "phone": phone,
             "address": address,
             "city": city,
-            "updated_at": datetime.utcnow()
+            "updated_at": datetime.now(UTC).replace(tzinfo=None)
         }})
 
         # Check password change

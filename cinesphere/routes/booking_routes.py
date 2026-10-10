@@ -1,6 +1,6 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, abort, jsonify
+﻿from flask import Blueprint, render_template, request, redirect, url_for, flash, session, abort, jsonify
 from bson import ObjectId
-from datetime import datetime
+from datetime import UTC, datetime
 from cinesphere.models.database import get_db
 from cinesphere.utils.decorators import login_required, role_required
 from cinesphere.services.booking_service import BookingService
@@ -39,7 +39,7 @@ def select_seats(showtime_id):
         if cust:
             customer_tier = cust.get("tier", "Free")
         elif session.get("role") == "worker":
-            month_key = datetime.utcnow().strftime("%Y-%m")
+            month_key = datetime.now(UTC).replace(tzinfo=None).strftime("%Y-%m")
             used = list(db.bookings.find({
                 "customer_id": ObjectId(session["user_id"]),
                 "employee_benefit.month": month_key,
@@ -110,7 +110,7 @@ def book_employee_benefit(showtime_id):
     if len(seat_numbers) != len(set(seat_numbers)) or any(seat not in valid_seats for seat in seat_numbers):
         return jsonify({"success": False, "error": "One or more selected seats are invalid."}), 400
 
-    month_key = datetime.utcnow().strftime("%Y-%m")
+    month_key = datetime.now(UTC).replace(tzinfo=None).strftime("%Y-%m")
     prior = list(db.bookings.find({
         "customer_id": uid,
         "employee_benefit.month": month_key,
@@ -199,7 +199,7 @@ def create_razorpay_order(showtime_id):
     discount_amount = round(pricing["subtotal"] * discount_pct)
     grand_total = max(1, pricing["grand_total"] - discount_amount)
 
-    receipt_id = f"REC_{showtime_id[-6:]}_{int(datetime.utcnow().timestamp())}"
+    receipt_id = f"REC_{showtime_id[-6:]}_{int(datetime.now(UTC).replace(tzinfo=None).timestamp())}"
     order, err = razorpay_service.create_order(
         amount_in_inr=grand_total,
         receipt_id=receipt_id,
@@ -311,7 +311,7 @@ def checkout(showtime_id):
     seats_selected_str = request.form.get("selected_seats", "").strip()
     payment_method = request.form.get("payment_method", "Razorpay Online")
     razorpay_order_id = request.form.get("razorpay_order_id", "")
-    razorpay_payment_id = request.form.get("razorpay_payment_id", f"pay_rzp_{int(datetime.utcnow().timestamp())}")
+    razorpay_payment_id = request.form.get("razorpay_payment_id", f"pay_rzp_{int(datetime.now(UTC).replace(tzinfo=None).timestamp())}")
     razorpay_signature = request.form.get("razorpay_signature", "")
 
     if not seats_selected_str:

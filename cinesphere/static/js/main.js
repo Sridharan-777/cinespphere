@@ -1,5 +1,12 @@
 // CineSphere Interactive Core
 document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll("[data-background-image]").forEach(element => {
+        const imageUrl = element.dataset.backgroundImage;
+        if (imageUrl) {
+            element.style.backgroundImage = `url(${JSON.stringify(imageUrl)})`;
+        }
+    });
+
     // Auto-dismiss flash alerts after 6 seconds
     const alerts = document.querySelectorAll(".flash-alert");
     alerts.forEach(alert => {

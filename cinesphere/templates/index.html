@@ -3,7 +3,7 @@
 {% block content %}
 <!-- Hero Movie Banner -->
 {% if featured_movie %}
-<section class="hero-backdrop" style="background-image: url('{{ featured_movie.backdrop_url }}');">
+<section class="hero-backdrop" data-background-image="{{ featured_movie.backdrop_url }}">
     <div class="hero-overlay"></div>
     <div class="hero-content">
         <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.8rem;">

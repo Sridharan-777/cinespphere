@@ -16,7 +16,7 @@
     <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem;">
         <h3 style="font-size: 1.1rem; margin-bottom: 1rem;">Next Reward Goal (500 pts)</h3>
         <div style="height: 12px; background: var(--bg-secondary); border-radius: 6px; overflow: hidden; margin-bottom: 0.5rem;">
-            <div style="height: 100%; width: {% if loyalty_points >= 500 %}100{% else %}{{ (loyalty_points / 500) * 100 }}{% endif %}%; background: linear-gradient(90deg, var(--primary), var(--accent)); transition: width 0.5s ease;"></div>
+        <progress class="rewards-progress" value="{{ loyalty_points if loyalty_points < 500 else 500 }}" max="500">{{ loyalty_points }} / 500</progress>
         </div>
         <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-muted);">
             <span>0 pts</span>

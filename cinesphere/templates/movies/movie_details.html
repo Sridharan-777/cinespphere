@@ -114,7 +114,7 @@
                 <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem; font-size: 0.85rem;">
                     <span>{{ star }} ★</span>
                     <div style="flex: 1; height: 8px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden;">
-                        <div style="width: {{ data.pct }}%; height: 100%; background: var(--accent);"></div>
+                        <progress class="rating-progress" value="{{ data.pct }}" max="100">{{ data.pct }}%</progress>
                     </div>
                     <span style="color: var(--text-muted); font-size: 0.8rem; width: 40px; text-align: right;">{{ data.pct }}%</span>
                 </div>
