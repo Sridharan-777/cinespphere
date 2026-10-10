@@ -4,29 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}CineSphere — Movie Theater Management & Ticket Booking{% endblock %}</title>
-    <!-- Dynamic theme initialization before render to avoid flash of wrong color -->
     <script>
-        (function() {
-            const savedTheme = localStorage.getItem('cinesphere_primary_color');
-            if (savedTheme) {
-                document.documentElement.style.setProperty('--primary', savedTheme);
-                document.documentElement.style.setProperty('--primary-hover', savedTheme);
-            }
-            if (localStorage.getItem('cinesphere_light_mode') === 'true') {
-                document.documentElement.classList.add('light-mode');
-            }
-        })();
+        if (localStorage.getItem('cinesphere_light_mode') === 'true') {
+            document.documentElement.classList.add('light-mode');
+        }
     </script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <style>
-        .elderly-mode * {
-            font-size: 1.25rem !important;
-            line-height: 1.8 !important;
-        }
-        .elderly-mode h1 { font-size: 2.5rem !important; }
-        .elderly-mode h2 { font-size: 2rem !important; }
-        .elderly-mode .btn { padding: 1rem 2rem !important; font-weight: 800 !important; }
-    </style>
     {% block extra_head %}{% endblock %}
 </head>
 <body class="text-light">
@@ -40,77 +23,56 @@
                 <span class="logo-text">Cine<span class="text-primary">Sphere</span></span>
             </a>
 
-            <!-- Search bar -->
-            <form action="{{ url_for('movies.search') }}" method="GET" class="nav-search-form">
-                <input type="text" name="q" placeholder="Search..." class="nav-search-input" value="{{ request.args.get('q', '') }}">
-                <button type="submit" class="nav-search-btn" aria-label="Search">Search</button>
-            </form>
-            
-            <div id="google_translate_element" style="margin-left: 1rem; margin-right: auto; transform: scale(0.85); transform-origin: left center;"></div>
-
             <nav class="nav-links">
-                <button onclick="toggleElderlyMode()" class="nav-link utility-button" title="Accessibility Mode">Aa</button>
-                <button onclick="toggleLightMode()" id="theme-toggle-btn" class="nav-link utility-button" title="Toggle Light/Dark Theme">Light</button>
-                <a href="{{ url_for('public.index') }}" class="nav-link {% if request.endpoint == 'public.index' %}active{% endif %}">Home</a>
-                <a href="{{ url_for('movies.movie_list') if 'movies' in (request.blueprint or '') else '#' }}" class="nav-link {% if request.endpoint and 'movies' in request.endpoint and request.args.get('region') != 'south' %}active{% endif %}">Movies</a>
-                <a href="{{ url_for('movies.movie_list', region='south') }}" class="nav-link {% if request.args.get('region') == 'south' %}active{% endif %}" style="color: #fcd34d;">
-                    South Cinema
-                </a>
-                <a href="{{ url_for('public.theaters_list') if 'public' in (request.blueprint or '') else '#' }}" class="nav-link {% if request.endpoint and 'theaters' in request.endpoint %}active{% endif %}">Theaters</a>
-                <a href="{{ url_for('customer.plans') }}" class="nav-link" style="color: var(--accent); font-weight: 600;">Plans</a>
-
                 {% if session.get('user_id') %}
                     {% if session.get('role') == 'customer' %}
-                        <a href="{{ url_for('customer.my_bookings') }}" class="nav-link">My Bookings</a>
-                        <a href="{{ url_for('customer.favorites') }}" class="nav-link">Favorites</a>
-                        <a href="{{ url_for('customer.my_reviews') }}" class="nav-link">Reviews</a>
-                        <a href="{{ url_for('customer.dashboard') }}" class="nav-link badge-link">Dashboard</a>
-                        <a href="{{ url_for('customer.notifications') }}" class="nav-link notif-link" title="Notifications">Alerts</a>
+                        <a href="{{ url_for('public.index') }}" class="nav-link {% if request.endpoint == 'public.index' %}active{% endif %}">Home</a>
+                        <a href="{{ url_for('movies.movie_list') }}" class="nav-link {% if request.blueprint == 'movies' %}active{% endif %}">Movies</a>
+                        <a href="{{ url_for('customer.dashboard') }}" class="nav-link {% if request.endpoint == 'customer.dashboard' %}active{% endif %}">Dashboard</a>
+                        <a href="{{ url_for('customer.my_bookings') }}" class="nav-link {% if request.endpoint == 'customer.my_bookings' %}active{% endif %}">Bookings</a>
+                        <a href="{{ url_for('customer.notifications') }}" class="nav-link {% if request.endpoint == 'customer.notifications' %}active{% endif %}">Alerts</a>
                     {% elif session.get('role') == 'staff' %}
-                        <a href="{{ url_for('staff.dashboard') }}" class="nav-link active">Staff Portal</a>
-                        <a href="{{ url_for('staff.customers_list') }}" class="nav-link">Patrons</a>
-                        <a href="{{ url_for('staff.workers_list') }}" class="nav-link">Workers</a>
-                        <a href="{{ url_for('staff.shows_list') }}" class="nav-link">Shows</a>
-                        <a href="{{ url_for('staff.tasks') }}" class="nav-link">Tasks</a>
-                        <a href="{{ url_for('staff.reports') }}" class="nav-link">Analytics</a>
+                        <a href="{{ url_for('staff.dashboard') }}" class="nav-link {% if request.endpoint == 'staff.dashboard' %}active{% endif %}">Dashboard</a>
+                        <a href="{{ url_for('staff.customers_list') }}" class="nav-link {% if request.endpoint == 'staff.customers_list' %}active{% endif %}">Patrons</a>
+                        <a href="{{ url_for('staff.workers_list') }}" class="nav-link {% if request.endpoint and 'worker' in request.endpoint %}active{% endif %}">Workers</a>
+                        <a href="{{ url_for('staff.shows_list') }}" class="nav-link {% if request.endpoint and 'show' in request.endpoint %}active{% endif %}">Shows</a>
+                        <a href="{{ url_for('staff.tasks') }}" class="nav-link {% if request.endpoint == 'staff.tasks' %}active{% endif %}">Tasks</a>
+                        <a href="{{ url_for('staff.reports') }}" class="nav-link {% if request.endpoint == 'staff.reports' %}active{% endif %}">Reports</a>
                     {% elif session.get('role') == 'worker' %}
-                        <a href="{{ url_for('worker.dashboard') }}" class="nav-link active">Worker Portal</a>
-                        <a href="{{ url_for('worker.tasks_list') }}" class="nav-link">My Tasks</a>
-                        <a href="{{ url_for('worker.attendance') }}" class="nav-link">Attendance</a>
+                        <a href="{{ url_for('worker.dashboard') }}" class="nav-link {% if request.endpoint == 'worker.dashboard' %}active{% endif %}">Dashboard</a>
+                        <a href="{{ url_for('worker.tasks_list') }}" class="nav-link {% if request.endpoint == 'worker.tasks_list' %}active{% endif %}">Tasks</a>
+                        <a href="{{ url_for('worker.attendance') }}" class="nav-link {% if request.endpoint == 'worker.attendance' %}active{% endif %}">Attendance</a>
+                        <a href="{{ url_for('worker.profile') }}" class="nav-link {% if request.endpoint == 'worker.profile' %}active{% endif %}">Profile</a>
                     {% elif session.get('role') == 'admin' %}
-                        <a href="{{ url_for('admin.dashboard') }}" class="nav-link active">Admin Panel</a>
-                        <a href="{{ url_for('admin.theaters') }}" class="nav-link">Theaters</a>
-                        <a href="{{ url_for('admin.staff_management') }}" class="nav-link">Staff</a>
-                        <a href="{{ url_for('admin.movies') }}" class="nav-link">Movies</a>
-                        <a href="{{ url_for('admin.reviews_moderation') }}" class="nav-link">Reviews</a>
-                        <a href="{{ url_for('admin.users_list') }}" class="nav-link">Users</a>
-                        <a href="{{ url_for('admin.session_history') }}" class="nav-link">Sessions</a>
-                        <a href="{{ url_for('admin.audit_logs') }}" class="nav-link">Audit</a>
+                        <a href="{{ url_for('admin.dashboard') }}" class="nav-link {% if request.endpoint == 'admin.dashboard' %}active{% endif %}">Dashboard</a>
+                        <a href="{{ url_for('admin.theaters') }}" class="nav-link {% if request.endpoint and 'theater' in request.endpoint %}active{% endif %}">Theaters</a>
+                        <a href="{{ url_for('admin.staff_management') }}" class="nav-link {% if request.endpoint and 'staff' in request.endpoint %}active{% endif %}">Staff</a>
+                        <a href="{{ url_for('admin.movies') }}" class="nav-link {% if request.endpoint and 'movie' in request.endpoint %}active{% endif %}">Movies</a>
+                        <a href="{{ url_for('admin.users_list') }}" class="nav-link {% if request.endpoint and 'user' in request.endpoint %}active{% endif %}">Users</a>
+                        <a href="{{ url_for('admin.audit_logs') }}" class="nav-link {% if request.endpoint == 'admin.audit_logs' %}active{% endif %}">Audit</a>
                     {% endif %}
-
-                    <!-- Theme Color Picker Dropdown -->
-                    <div style="display: flex; align-items: center; margin-left: 0.3rem;" title="Customize Theme Color">
-                        <label for="theme-color-picker" class="theme-color-label">Color</label>
-                        <input type="color" id="theme-color-picker" style="opacity: 0; width: 0; height: 0; position: absolute;" onchange="changeAppTheme(this.value)">
-                    </div>
-
-                    <div class="user-dropdown">
-                        <span class="user-pill">{{ session.get('name') }} <span class="role-tag role-{{ session.get('role') }}">{{ session.get('role')|upper }}</span></span>
-                        <a href="{{ url_for('auth.logout') }}" class="btn-logout">Logout</a>
-                    </div>
                 {% else %}
-                    <!-- Theme Color Picker for Guests -->
-                    <div style="display: flex; align-items: center; margin-left: 0.3rem;" title="Customize Theme Color">
-                        <label for="theme-color-picker" class="theme-color-label">Color</label>
-                        <input type="color" id="theme-color-picker" style="opacity: 0; width: 0; height: 0; position: absolute;" onchange="changeAppTheme(this.value)">
-                    </div>
-
-                    <div class="auth-buttons">
-                        <a href="{{ url_for('auth.login') }}" class="btn btn-outline">Login</a>
-                        <a href="{{ url_for('auth.register') }}" class="btn btn-primary">Register</a>
-                    </div>
+                    <a href="{{ url_for('public.index') }}" class="nav-link {% if request.endpoint == 'public.index' %}active{% endif %}">Home</a>
+                    <a href="{{ url_for('movies.movie_list') }}" class="nav-link {% if request.blueprint == 'movies' %}active{% endif %}">Movies</a>
+                    <a href="{{ url_for('public.theaters_list') }}" class="nav-link {% if request.endpoint == 'public.theaters_list' %}active{% endif %}">Theaters</a>
                 {% endif %}
             </nav>
+
+            <div class="nav-actions">
+                <button type="button" onclick="toggleLightMode()" id="theme-toggle-btn" class="nav-theme-toggle" aria-label="Switch to light theme">Light</button>
+                {% if session.get('user_id') %}
+                <details class="account-menu">
+                    <summary>{{ session.get('name', 'Account').split()[0] }}</summary>
+                    <div class="account-menu-panel">
+                        <span class="role-tag role-{{ session.get('role') }}">{{ session.get('role')|upper }}</span>
+                        <a href="{{ url_for('auth.logout') }}">Logout</a>
+                    </div>
+                </details>
+                {% else %}
+                <a href="{{ url_for('auth.login') }}" class="btn btn-outline nav-login">Login</a>
+                <a href="{{ url_for('auth.register') }}" class="btn btn-primary nav-register">Register</a>
+                {% endif %}
+            </div>
         </div>
     </header>
 
@@ -144,14 +106,10 @@
                     <img src="/static/images/logo.svg" alt="CineSphere Logo" style="width: 28px; height: 28px;">
                     <span>Cine<span class="text-primary">Sphere</span></span>
                 </div>
-                <p class="footer-desc">
-                    Enterprise cinema management & ticket booking platform featuring Razorpay payments, custom color personalization, and 3 customer tiers: Free, Plus, and Pro.
-                </p>
+                <p class="footer-desc">Movie discovery, secure ticket booking, and cinema operations in one place.</p>
                 <div class="footer-badges">
-                    <span class="badge">Flask 3.1</span>
-                    <span class="badge">MongoDB 7.0</span>
-                    <span class="badge">Razorpay Payments</span>
-                    <span class="badge">Dynamic Theme Engine</span>
+                    <span class="badge">Secure booking</span>
+                    <span class="badge">Online payments</span>
                 </div>
             </div>
             <div class="footer-col">
@@ -165,18 +123,10 @@
                 </ul>
             </div>
             <div class="footer-col">
-                <h4>Membership & Themes</h4>
+                <h4>Membership</h4>
                 <ul class="footer-list">
                     <li><a href="{{ url_for('customer.plans') }}">Free, Plus, Pro Plans</a></li>
-                    <li><span style="font-size: 0.85rem; color: #a1a1aa;">Preset Colors:</span></li>
-                    <li style="display: flex; gap: 0.4rem; margin-top: 0.3rem;">
-                        <button onclick="changeAppTheme('#e50914')" style="width: 20px; height: 20px; background: #e50914; border-radius: 50%; border: 1px solid #fff; cursor: pointer;"></button>
-                        <button onclick="changeAppTheme('#2563eb')" style="width: 20px; height: 20px; background: #2563eb; border-radius: 50%; border: 1px solid #fff; cursor: pointer;"></button>
-                        <button onclick="changeAppTheme('#7c3aed')" style="width: 20px; height: 20px; background: #7c3aed; border-radius: 50%; border: 1px solid #fff; cursor: pointer;"></button>
-                        <button onclick="changeAppTheme('#059669')" style="width: 20px; height: 20px; background: #059669; border-radius: 50%; border: 1px solid #fff; cursor: pointer;"></button>
-                        <button onclick="changeAppTheme('#d97706')" style="width: 20px; height: 20px; background: #d97706; border-radius: 50%; border: 1px solid #fff; cursor: pointer;"></button>
-                        <button onclick="changeAppTheme('#db2777')" style="width: 20px; height: 20px; background: #db2777; border-radius: 50%; border: 1px solid #fff; cursor: pointer;"></button>
-                    </li>
+                    <li><a href="{{ url_for('customer.my_bookings') }}">My Bookings</a></li>
                 </ul>
             </div>
             <div class="footer-col">
@@ -195,71 +145,25 @@
     </footer>
 
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-    <script type="text/javascript">
-        function googleTranslateElementInit() {
-            new google.translate.TranslateElement({pageLanguage: 'en'}, 'google_translate_element');
-        }
-    </script>
-    <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
     <script>
-    function changeAppTheme(colorHex) {
-        document.documentElement.style.setProperty('--primary', colorHex);
-        document.documentElement.style.setProperty('--primary-hover', colorHex);
-        localStorage.setItem('cinesphere_primary_color', colorHex);
-    }
-    
-    function toggleElderlyMode() {
-        const body = document.body;
-        const isElderly = body.classList.toggle('elderly-mode');
-        localStorage.setItem('cinesphere_elderly_mode', isElderly);
-        
-        if (isElderly) {
-            alert("Accessibility Mode Activated!\n\nFonts are now much larger for easier reading.\n\nInstructions: To book a movie, click 'Movies' in the menu, select any movie you like, choose your showtime, and click 'Book Seats'!");
-            removeEmojis();
-        } else {
-            location.reload(); // Reload to restore emojis
+        function setThemeButton(isLight) {
+            const button = document.getElementById('theme-toggle-btn');
+            if (!button) return;
+            button.textContent = isLight ? 'Dark' : 'Light';
+            button.setAttribute('aria-label', isLight ? 'Switch to dark theme' : 'Switch to light theme');
         }
-    }
-    
-    function removeEmojis() {
-        const emojiPattern = /[\p{Extended_Pictographic}\u2600-\u27BF\uFE0F]/gu;
-        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
-        let node;
-        while (node = walker.nextNode()) {
-            node.nodeValue = node.nodeValue.replace(emojiPattern, '').replace(/\s{2,}/g, ' ');
-        }
-    }
 
-    // Auto-init elderly mode on load
-    if (localStorage.getItem('cinesphere_elderly_mode') === 'true') {
-        document.body.classList.add('elderly-mode');
-        window.addEventListener('load', removeEmojis);
-    }
-    
-    // Light mode logic
-    function toggleLightMode() {
-        const isLight = document.body.classList.toggle('light-mode');
-        document.documentElement.classList.toggle('light-mode', isLight);
-        localStorage.setItem('cinesphere_light_mode', isLight);
-        updateThemeToggleButton(isLight);
-    }
-    
-    function updateThemeToggleButton(isLight) {
-        const btn = document.getElementById('theme-toggle-btn');
-        if (btn) {
-            btn.innerText = isLight ? "Dark" : "Light";
+        function toggleLightMode() {
+            const isLight = !document.documentElement.classList.contains('light-mode');
+            document.documentElement.classList.toggle('light-mode', isLight);
+            document.body.classList.toggle('light-mode', isLight);
+            localStorage.setItem('cinesphere_light_mode', String(isLight));
+            setThemeButton(isLight);
         }
-    }
-    
-    if (localStorage.getItem('cinesphere_light_mode') === 'true') {
-        document.body.classList.add('light-mode');
-        updateThemeToggleButton(true);
-    } else {
-        updateThemeToggleButton(false);
-    }
 
-    // Product copy uses plain text throughout; remove legacy pictographs rendered by old templates.
-    document.addEventListener('DOMContentLoaded', removeEmojis);
+        const savedLightMode = localStorage.getItem('cinesphere_light_mode') === 'true';
+        document.body.classList.toggle('light-mode', savedLightMode);
+        setThemeButton(savedLightMode);
     </script>
     {% block scripts %}{% endblock %}
 </body>
