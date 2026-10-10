@@ -39,7 +39,7 @@ def dashboard():
         "attended_days": attended_days,
         "working_days": working_days,
         "rewards_collected": completed_tasks,
-        "reward_coins": completed_tasks * 10,
+        "reward_coins": completed_tasks * 10 + int(worker.get("bonus_coins", 0)),
     }
 
     # Footfall & approaching customers statistics

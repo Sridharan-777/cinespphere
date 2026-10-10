@@ -52,6 +52,7 @@
                         <a href="{{ url_for('admin.staff_management') }}" class="nav-link {% if request.endpoint and 'staff' in request.endpoint %}active{% endif %}">Staff</a>
                         <a href="{{ url_for('admin.movies') }}" class="nav-link {% if request.endpoint and 'movie' in request.endpoint %}active{% endif %}">Movies</a>
                         <a href="{{ url_for('admin.users_list') }}" class="nav-link {% if request.endpoint and 'user' in request.endpoint %}active{% endif %}">Users</a>
+                        <a href="{{ url_for('admin.operations') }}" class="nav-link {% if request.endpoint and 'operations' in request.endpoint %}active{% endif %}">Operations</a>
                         <a href="{{ url_for('admin.audit_logs') }}" class="nav-link {% if request.endpoint == 'admin.audit_logs' %}active{% endif %}">Audit</a>
                     {% endif %}
                 {% else %}

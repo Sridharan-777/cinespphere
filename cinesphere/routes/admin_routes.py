@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from bson import ObjectId
 from werkzeug.security import generate_password_hash
 from cinesphere.models.database import get_db
-from cinesphere.models.worker_model import count_workers, list_workers
+from cinesphere.models.worker_model import count_workers, find_worker, list_workers
 from cinesphere.utils.decorators import role_required
 from cinesphere.services.report_service import ReportService
 from cinesphere.services.tmdb_service import tmdb_service
@@ -624,3 +624,128 @@ def export_report():
         mimetype="text/csv",
         headers={"Content-Disposition": "attachment;filename=cinesphere_users_report.csv"}
     )
+
+@admin_bp.route("/admin/operations")
+@role_required("admin")
+def operations():
+    db = get_db()
+    workers = list_workers()
+    attendance = list(db.attendance.find().sort("date", -1).limit(100))
+    tasks = list(db.tasks.find().sort("created_at", -1).limit(100))
+    bookings = list(db.bookings.find().sort("created_at", -1).limit(100))
+    customers = list(db.users.find({"role": "customer"}).sort("name", 1))
+    rewards = list(db.reward_transactions.find().sort("created_at", -1).limit(100))
+    theaters = list(db.theaters.find({"status": "active"}).sort("name", 1))
+    return render_template("admin/operations.html", workers=workers, attendance=attendance,
+        tasks=tasks, bookings=bookings, customers=customers, rewards=rewards, theaters=theaters)
+
+@admin_bp.route("/admin/operations/workers/create", methods=["POST"])
+@role_required("admin")
+def operations_worker_create():
+    db = get_db()
+    name = request.form.get("name", "").strip(); email = request.form.get("email", "").strip().lower()
+    try: theater_id = ObjectId(request.form.get("theater_id"))
+    except Exception: theater_id = None
+    theater = db.theaters.find_one({"_id": theater_id}) if theater_id else None
+    if not name or not email or not theater or db.users.find_one({"email": email}):
+        flash("Valid worker details, unique email and theater are required.", "danger")
+        return redirect(url_for("admin.operations"))
+    now = datetime.now(UTC).replace(tzinfo=None); salary = request.form.get("salary", type=float) or 22000
+    db.users.insert_one({"name": name, "email": email, "phone": request.form.get("phone", ""),
+        "password_hash": generate_password_hash(request.form.get("password", "Worker@1234")), "role": "worker",
+        "status": "active", "created_at": now, "worker_profile": {"employee_code": f"WRK-ADM-{int(now.timestamp())}",
+        "theater_id": theater_id, "theater_name": theater["name"], "department": request.form.get("department", "Operations"),
+        "designation": request.form.get("designation", "Operations Worker"), "monthly_salary": salary,
+        "hourly_rate": round(salary / 160, 2), "shift_timings": request.form.get("shift_timings", "09:00 AM - 05:30 PM"),
+        "current_task": "Idle / On Call", "bonus_coins": 0}})
+    flash("Worker created.", "success"); return redirect(url_for("admin.operations"))
+
+@admin_bp.route("/admin/operations/workers/<worker_id>", methods=["POST"])
+@role_required("admin")
+def operations_worker_update(worker_id):
+    db = get_db(); oid = ObjectId(worker_id); salary = request.form.get("salary", type=float) or 22000
+    db.users.update_one({"_id": oid, "role": "worker"}, {"$set": {"name": request.form.get("name", "").strip(),
+        "status": request.form.get("status", "active"), "worker_profile.department": request.form.get("department", ""),
+        "worker_profile.monthly_salary": salary, "worker_profile.hourly_rate": round(salary / 160, 2),
+        "worker_profile.bonus_coins": request.form.get("bonus_coins", type=int) or 0}})
+    flash("Worker updated.", "success"); return redirect(url_for("admin.operations"))
+
+@admin_bp.route("/admin/operations/workers/<worker_id>/delete", methods=["POST"])
+@role_required("admin")
+def operations_worker_delete(worker_id):
+    db = get_db(); oid = ObjectId(worker_id)
+    db.tasks.delete_many({"assigned_worker_id": oid}); db.attendance.delete_many({"worker_id": oid})
+    db.reward_transactions.delete_many({"user_id": oid}); db.user_sessions.delete_many({"user_id": oid})
+    db.users.delete_one({"_id": oid, "role": "worker"})
+    flash("Worker and linked operational records deleted.", "success"); return redirect(url_for("admin.operations"))
+
+@admin_bp.route("/admin/operations/attendance/create", methods=["POST"])
+@role_required("admin")
+def operations_attendance_create():
+    db = get_db(); worker = find_worker(request.form.get("worker_id"))
+    if not worker: abort(404)
+    db.attendance.update_one({"worker_id": worker["_id"], "date": request.form.get("date")}, {"$set": {
+        "worker_name": worker["name"], "theater_id": worker["theater_id"], "check_in": request.form.get("check_in"),
+        "check_out": request.form.get("check_out") or None, "status": request.form.get("status", "Present")}}, upsert=True)
+    flash("Attendance saved.", "success"); return redirect(url_for("admin.operations"))
+
+@admin_bp.route("/admin/operations/attendance/<record_id>/delete", methods=["POST"])
+@role_required("admin")
+def operations_attendance_delete(record_id):
+    get_db().attendance.delete_one({"_id": ObjectId(record_id)})
+    flash("Attendance deleted.", "success"); return redirect(url_for("admin.operations"))
+
+@admin_bp.route("/admin/operations/tasks/create", methods=["POST"])
+@role_required("admin")
+def operations_task_create():
+    db = get_db(); worker = find_worker(request.form.get("worker_id"))
+    if not worker: abort(404)
+    db.tasks.insert_one({"theater_id": worker["theater_id"], "assigned_worker_id": worker["_id"],
+        "worker_name": worker["name"], "title": request.form.get("title", "").strip(),
+        "description": request.form.get("description", "").strip(), "priority": request.form.get("priority", "Medium"),
+        "status": "Pending", "created_by": "Administrator", "notes": "", "created_at": datetime.now(UTC).replace(tzinfo=None)})
+    flash("Task created.", "success"); return redirect(url_for("admin.operations"))
+
+@admin_bp.route("/admin/operations/tasks/<task_id>", methods=["POST"])
+@role_required("admin")
+def operations_task_update(task_id):
+    get_db().tasks.update_one({"_id": ObjectId(task_id)}, {"$set": {"title": request.form.get("title", "").strip(),
+        "status": request.form.get("status", "Pending"), "priority": request.form.get("priority", "Medium")}})
+    flash("Task updated.", "success"); return redirect(url_for("admin.operations"))
+
+@admin_bp.route("/admin/operations/tasks/<task_id>/delete", methods=["POST"])
+@role_required("admin")
+def operations_task_delete(task_id):
+    get_db().tasks.delete_one({"_id": ObjectId(task_id)})
+    flash("Task deleted.", "success"); return redirect(url_for("admin.operations"))
+
+@admin_bp.route("/admin/operations/bookings/<booking_id>", methods=["POST"])
+@role_required("admin")
+def operations_booking_update(booking_id):
+    get_db().bookings.update_one({"_id": ObjectId(booking_id)}, {"$set": {"status": request.form.get("status", "Confirmed")}})
+    flash("Booking updated.", "success"); return redirect(url_for("admin.operations"))
+
+@admin_bp.route("/admin/operations/bookings/<booking_id>/delete", methods=["POST"])
+@role_required("admin")
+def operations_booking_delete(booking_id):
+    get_db().bookings.delete_one({"_id": ObjectId(booking_id)})
+    flash("Booking deleted.", "success"); return redirect(url_for("admin.operations"))
+
+@admin_bp.route("/admin/operations/rewards/create", methods=["POST"])
+@role_required("admin")
+def operations_reward_create():
+    db = get_db(); user_id = ObjectId(request.form.get("user_id")); amount = request.form.get("amount", type=int) or 0
+    user = db.users.find_one({"_id": user_id})
+    if not user: abort(404)
+    if user.get("role") == "customer": db.customers.update_one({"user_id": user_id}, {"$inc": {"loyalty_points": amount}})
+    elif user.get("role") == "worker": db.users.update_one({"_id": user_id}, {"$inc": {"worker_profile.bonus_coins": amount}})
+    db.reward_transactions.insert_one({"user_id": user_id, "name": user.get("name"), "role": user.get("role"),
+        "amount": amount, "reason": request.form.get("reason", "Admin adjustment"), "created_at": datetime.now(UTC).replace(tzinfo=None)})
+    flash("Reward transaction created.", "success"); return redirect(url_for("admin.operations"))
+
+@admin_bp.route("/admin/operations/rewards/<reward_id>/delete", methods=["POST"])
+@role_required("admin")
+def operations_reward_delete(reward_id):
+    get_db().reward_transactions.delete_one({"_id": ObjectId(reward_id)})
+    flash("Reward transaction log deleted; awarded balance is unchanged.", "success")
+    return redirect(url_for("admin.operations"))
