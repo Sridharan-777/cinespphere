@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}My excellence rewards — CineSphere{% endblock %}
+{% block content %}
+<div class="container">
+    <header class="page-heading"><span class="eyebrow">Private worker record</span><h1>Excellence rewards</h1>
+        <p>Your evidence, policy status, awards, and admission-credit ledger.</p></header>
+    {% if policy.status != 'active' %}<div class="state-card state-warning"><strong>Draft policy</strong><p>{{ policy.notes }}</p></div>{% endif %}
+    <div class="dashboard-grid">
+        <div class="stat-card"><div class="stat-title">Eligible scheduled shifts</div><div class="stat-value">{{ eligibility.eligible_shifts }}</div></div>
+        <div class="stat-card"><div class="stat-title">Attendance reliability</div><div class="stat-value">{{ eligibility.attendance_score if eligibility.attendance_score is not none else 'N/A' }}{% if eligibility.attendance_score is not none %}%{% endif %}</div></div>
+        <div class="stat-card"><div class="stat-title">Verified maintenance evidence</div><div class="stat-value">{{ eligibility.verified_tasks }}</div></div>
+        <div class="stat-card"><div class="stat-title">Verified quality</div><div class="stat-value">{{ eligibility.quality_score if eligibility.quality_score is not none else 'N/A' }}{% if eligibility.quality_score is not none %}%{% endif %}</div></div>
+    </div>
+    {% for reason in eligibility.reasons %}<p class="inline-notice">{{ reason }}</p>{% endfor %}
+    <section class="table-card"><div class="section-header"><h2>Admission-credit ledger</h2><a class="btn btn-primary btn-sm" href="{{ url_for('movies.movie_list') }}">Find an eligible show</a></div>
+        <div class="table-responsive"><table class="custom-table"><thead><tr><th>Cycle</th><th>Status</th><th>Issued</th><th>Expires</th><th>Employer-funded value</th></tr></thead><tbody>
+        {% for credit in credits %}<tr><td>{{ credit.cycle }}</td><td>{{ credit.status }}</td><td>{{ credit.issued_at.strftime('%d %b %Y') }}</td><td>{{ credit.expires_at.strftime('%d %b %Y') }}</td><td>{% if credit.employer_funded_value is defined %}₹{{ credit.employer_funded_value }}{% else %}—{% endif %}</td></tr>
+        {% else %}<tr><td colspan="5" class="empty-cell">No credits have been issued.</td></tr>{% endfor %}</tbody></table></div>
+    </section>
+</div>
+{% endblock %}

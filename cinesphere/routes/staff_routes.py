@@ -7,6 +7,8 @@ from cinesphere.models.worker_model import count_workers, find_worker, list_work
 from cinesphere.utils.decorators import role_required
 from cinesphere.services.report_service import ReportService
 from cinesphere.utils.audit import log_audit
+from cinesphere.services.reward_service import RewardService
+from cinesphere.services.payroll_service import PayrollService
 
 import os
 from uuid import uuid4
@@ -14,6 +16,23 @@ from flask import current_app
 from werkzeug.utils import secure_filename
 
 staff_bp = Blueprint("staff", __name__)
+
+
+def _staff_profile():
+    return get_db().staff.find_one({"user_id": ObjectId(session["user_id"]), "status": "active"})
+
+
+def _scoped_customer(db, theater_id, customer_id):
+    """Return a customer only when this theater has a legitimate service relationship."""
+    try:
+        customer_oid = ObjectId(customer_id)
+    except Exception:
+        return None
+    has_booking = db.bookings.find_one({"customer_id": customer_oid, "theater_id": theater_id}, {"_id": 1})
+    has_access = db.customer_theater_access.find_one({"customer_id": customer_oid, "theater_id": theater_id})
+    if not has_booking and not has_access:
+        return None
+    return db.users.find_one({"_id": customer_oid, "role": "customer"})
 
 @staff_bp.route("/staff/dashboard")
 @role_required("staff")
@@ -93,14 +112,21 @@ def customers_list():
         entry["ticket_count"] += len(booking.get("seats", []))
         if booking.get("status") == "Confirmed":
             entry["theater_spend"] += booking.get("pricing", {}).get("grand_total", 0)
-    for user in db.users.find({"role": "customer"}):
+    scoped_ids = {ObjectId(customer_id) for customer_id in patrons}
+    scoped_ids.update(row["customer_id"] for row in db.customer_theater_access.find(
+        {"theater_id": staff["theater_id"]}, {"customer_id": 1}))
+    access_by_customer = {str(row["customer_id"]): row for row in db.customer_theater_access.find(
+        {"theater_id": staff["theater_id"]})}
+    for user in db.users.find({"_id": {"$in": list(scoped_ids)}, "role": "customer"}):
         entry = patrons.setdefault(str(user["_id"]), {
             "name": user.get("name", "Customer"), "email": user.get("email", ""),
             "booking_count": 0, "ticket_count": 0, "theater_spend": 0,
             "last_visit": "", "last_booking_code": ""
         })
+        entry["name"] = user.get("name", entry["name"])
+        entry["email"] = user.get("email", entry["email"])
         entry["_id"] = user["_id"]
-        entry["status"] = user.get("status", "active")
+        entry["status"] = access_by_customer.get(str(user["_id"]), {}).get("status", "active")
     customers = list(patrons.values())
     if search:
         customers = [c for c in customers if search in c["name"].lower() or search in c["email"].lower()
@@ -193,7 +219,6 @@ def worker_create():
         phone = request.form.get("phone", "").strip()
         department = request.form.get("department", "Housekeeping")
         designation = request.form.get("designation", "Operations Worker")
-        salary = float(request.form.get("monthly_salary", 22000))
         shift = request.form.get("shift_timings", "09:00 AM - 05:30 PM")
 
         existing_user = db.users.find_one({"email": email})
@@ -207,8 +232,8 @@ def worker_create():
             "theater_name": staff["theater_name"],
             "department": department,
             "designation": designation,
-            "monthly_salary": salary,
-            "hourly_rate": round(salary / 160, 2),
+            "monthly_salary": 0,
+            "hourly_rate": 0,
             "shift_timings": shift,
             "current_task": "Idle / On Call"
         }
@@ -361,6 +386,124 @@ def reports():
 
     return render_template("staff/reports.html", stats=stats, bookings=bookings, theater=theater)
 
+
+@staff_bp.route("/staff/rewards")
+@role_required("staff")
+def reward_reviews():
+    db = get_db()
+    staff = _staff_profile()
+    if not staff:
+        abort(403)
+    workers = list_workers(staff["theater_id"], active_only=True)
+    candidates = [{"worker": worker, "evidence": RewardService.eligibility(worker["_id"])} for worker in workers]
+    awards = list(db.reward_awards.find({"theater_id": staff["theater_id"]}).sort("cycle", -1))
+    return render_template("staff/rewards.html", candidates=candidates, awards=awards, policy=RewardService.policy())
+
+
+@staff_bp.route("/staff/rewards/<worker_id>/recommend", methods=["POST"])
+@role_required("staff")
+def reward_recommend(worker_id):
+    db = get_db()
+    staff = _staff_profile()
+    worker = find_worker(worker_id, staff["theater_id"], active_only=True) if staff else None
+    if not worker:
+        abort(404)
+    cycle = request.form.get("cycle") or RewardService.cycle_key()
+    evidence = RewardService.eligibility(worker["_id"], cycle)
+    if not evidence["eligible"]:
+        flash("The available evidence does not meet the configured thresholds.", "warning")
+        return redirect(url_for("staff.reward_reviews"))
+    now = datetime.now(UTC).replace(tzinfo=None)
+    db.reward_awards.update_one({"worker_id": worker["_id"], "cycle": cycle}, {"$setOnInsert": {
+        "worker_id": worker["_id"], "worker_name": worker["name"], "theater_id": staff["theater_id"],
+        "cycle": cycle, "status": "Recommended", "evidence": evidence,
+        "recommended_by": staff["user_id"], "recommended_at": now, "created_at": now}}, upsert=True)
+    log_audit("REWARD_RECOMMENDED", "worker", worker["_id"], f"Recommended cycle {cycle}")
+    flash("Reward recommendation recorded for independent approval.", "success")
+    return redirect(url_for("staff.reward_reviews"))
+
+
+@staff_bp.route("/staff/rewards/<award_id>/review", methods=["POST"])
+@role_required("staff")
+def reward_review(award_id):
+    db = get_db()
+    staff = _staff_profile()
+    try:
+        award = db.reward_awards.find_one({"_id": ObjectId(award_id), "theater_id": staff["theater_id"]}) if staff else None
+    except Exception:
+        award = None
+    if not award:
+        abort(404)
+    decision = request.form.get("decision")
+    reason = request.form.get("reason", "").strip()
+    if decision not in {"approve", "reject"} or not reason:
+        flash("A valid decision and reason are required.", "danger")
+        return redirect(url_for("staff.reward_reviews"))
+    if award.get("recommended_by") == staff["user_id"] and decision == "approve":
+        flash("The recommender cannot also approve this award.", "danger")
+        return redirect(url_for("staff.reward_reviews"))
+    now = datetime.now(UTC).replace(tzinfo=None)
+    status = "Approved" if decision == "approve" else "Rejected"
+    db.reward_awards.update_one({"_id": award["_id"], "status": "Recommended"}, {"$set": {
+        "status": status, "reviewed_by": staff["user_id"], "reviewed_at": now, "review_reason": reason}})
+    award = db.reward_awards.find_one({"_id": award["_id"]})
+    if decision == "approve":
+        _, error = RewardService.issue_credits(award, staff["user_id"])
+        if error:
+            flash(error, "warning")
+            return redirect(url_for("staff.reward_reviews"))
+    log_audit(f"REWARD_{status.upper()}", "reward_award", award["_id"], reason)
+    flash(f"Award {status.lower()} with an auditable reason.", "success")
+    return redirect(url_for("staff.reward_reviews"))
+
+
+@staff_bp.route("/staff/payroll", methods=["GET", "POST"])
+@role_required("staff")
+def payroll():
+    db = get_db()
+    staff = _staff_profile()
+    if not staff:
+        abort(403)
+    if request.method == "POST":
+        worker = find_worker(request.form.get("worker_id"), staff["theater_id"], active_only=True)
+        if not worker:
+            abort(404)
+        _, error = PayrollService.calculate_draft(worker["_id"], request.form.get("period", ""), staff["user_id"])
+        flash(error or "Payroll draft calculated. It still requires independent approval.", "danger" if error else "success")
+        return redirect(url_for("staff.payroll"))
+    records = list(db.payroll.find({"theater_id": staff["theater_id"]}).sort("period", -1))
+    return render_template("staff/payroll.html", records=records,
+                           workers=list_workers(staff["theater_id"], active_only=True), policy=PayrollService.policy())
+
+
+@staff_bp.route("/staff/support", methods=["GET", "POST"])
+@role_required("staff")
+def support():
+    db = get_db()
+    staff = _staff_profile()
+    if not staff:
+        abort(403)
+    if request.method == "POST":
+        try:
+            ticket_id = ObjectId(request.form.get("ticket_id"))
+        except Exception:
+            ticket_id = None
+        ticket = db.support_tickets.find_one({"_id": ticket_id, "theater_id": staff["theater_id"]}) if ticket_id else None
+        reply = request.form.get("reply", "").strip()
+        status = request.form.get("status", "In Progress")
+        if not ticket or not reply or status not in {"Open", "In Progress", "Waiting on Customer", "Resolved", "Escalated"}:
+            flash("A scoped ticket, reply, and valid status are required.", "danger")
+        else:
+            now = datetime.now(UTC).replace(tzinfo=None)
+            db.support_tickets.update_one({"_id": ticket["_id"]}, {"$push": {"messages": {
+                "author_id": staff["user_id"], "author_role": "staff", "body": reply[:3000], "created_at": now}},
+                "$set": {"status": status, "assigned_to": staff["user_id"], "updated_at": now}})
+            log_audit("SUPPORT_TICKET_REPLIED", "support_ticket", ticket["_id"], f"Status {status}")
+            flash("Support reply recorded.", "success")
+        return redirect(url_for("staff.support"))
+    tickets = list(db.support_tickets.find({"theater_id": staff["theater_id"]}).sort("updated_at", -1))
+    return render_template("staff/support.html", tickets=tickets)
+
 @staff_bp.route("/staff/workers/<worker_id>/edit", methods=["POST"])
 @role_required("staff")
 def worker_edit(worker_id):
@@ -369,13 +512,11 @@ def worker_edit(worker_id):
     worker = find_worker(worker_id, staff["theater_id"]) if staff else None
     if not worker:
         abort(404)
-    salary = request.form.get("monthly_salary", type=float) or worker.get("monthly_salary", 22000)
     db.users.update_one({"_id": worker["_id"]}, {"$set": {"name": request.form.get("name", worker["name"]).strip()}})
     update_worker(worker["_id"], {
         "department": request.form.get("department", worker.get("department", "")).strip(),
         "designation": request.form.get("designation", worker.get("designation", "")).strip(),
         "shift_timings": request.form.get("shift_timings", worker.get("shift_timings", "")).strip(),
-        "monthly_salary": salary, "hourly_rate": round(salary / 160, 2),
     })
     flash("Worker updated.", "success")
     return redirect(url_for("staff.workers_list"))
@@ -388,29 +529,38 @@ def worker_delete(worker_id):
     worker = find_worker(worker_id, staff["theater_id"]) if staff else None
     if not worker:
         abort(404)
-    db.tasks.delete_many({"assigned_worker_id": worker["_id"]})
-    db.attendance.delete_many({"worker_id": worker["_id"]})
+    now = datetime.now(UTC).replace(tzinfo=None)
+    db.users.update_one({"_id": worker["_id"]}, {"$set": {"status": "inactive", "deactivated_at": now}})
+    db.workers.update_one({"user_id": worker["_id"]}, {"$set": {"status": "inactive", "deactivated_at": now}})
     db.user_sessions.delete_many({"user_id": worker["_id"]})
-    db.users.delete_one({"_id": worker["_id"]})
-    flash("Worker deleted.", "success")
+    log_audit("WORKER_DEACTIVATED", "worker", worker["_id"], "Employment access retired; history retained")
+    flash("Worker access deactivated. Tasks, attendance, payroll, and audit history were retained.", "success")
     return redirect(url_for("staff.workers_list"))
 
 @staff_bp.route("/staff/customers/create", methods=["POST"])
 @role_required("staff")
 def customer_create():
     db = get_db()
+    staff = _staff_profile()
+    if not staff:
+        abort(403)
     name = request.form.get("name", "").strip()
     email = request.form.get("email", "").strip().lower()
-    if not name or not email or db.users.find_one({"email": email}):
-        flash("A name and unique email are required.", "danger")
+    password = request.form.get("password", "")
+    if not name or not email or len(password) < 10 or db.users.find_one({"email": email}):
+        flash("A name, unique email, and password of at least 10 characters are required.", "danger")
         return redirect(url_for("staff.customers_list"))
     now = datetime.now(UTC).replace(tzinfo=None)
     result = db.users.insert_one({"name": name, "email": email, "phone": request.form.get("phone", "").strip(),
-        "password_hash": generate_password_hash(request.form.get("password", "Customer@1234")),
+        "password_hash": generate_password_hash(password),
         "role": "customer", "status": "active", "created_at": now})
     db.customers.insert_one({"user_id": result.inserted_id, "name": name, "email": email,
         "phone": request.form.get("phone", "").strip(), "tier": "Free", "favorite_movies": [],
         "loyalty_points": 0, "total_bookings": 0, "total_spent": 0, "status": "active"})
+    db.customer_theater_access.update_one(
+        {"customer_id": result.inserted_id, "theater_id": staff["theater_id"]},
+        {"$set": {"status": "active", "created_by": staff["user_id"], "updated_at": now}}, upsert=True)
+    log_audit("CUSTOMER_ACCESS_CREATED", "customer", result.inserted_id, "Scoped to staff theater")
     flash("Customer created.", "success")
     return redirect(url_for("staff.customers_list"))
 
@@ -418,29 +568,41 @@ def customer_create():
 @role_required("staff")
 def customer_edit(customer_id):
     db = get_db()
-    customer_oid = ObjectId(customer_id)
+    staff = _staff_profile()
+    customer = _scoped_customer(db, staff["theater_id"], customer_id) if staff else None
+    if not customer:
+        abort(404)
+    customer_oid = customer["_id"]
     name = request.form.get("name", "").strip()
     email = request.form.get("email", "").strip().lower()
     status = request.form.get("status", "active")
     if not name or not email or status not in {"active", "inactive"} or db.users.find_one({"email": email, "_id": {"$ne": customer_oid}}):
         flash("Valid details and a unique email are required.", "danger")
         return redirect(url_for("staff.customers_list"))
-    db.users.update_one({"_id": customer_oid, "role": "customer"}, {"$set": {"name": name, "email": email, "status": status}})
-    db.customers.update_one({"user_id": customer_oid}, {"$set": {"name": name, "email": email, "status": status}})
-    flash("Customer updated.", "success")
+    db.users.update_one({"_id": customer_oid, "role": "customer"}, {"$set": {"name": name, "email": email}})
+    db.customers.update_one({"user_id": customer_oid}, {"$set": {"name": name, "email": email}})
+    db.customer_theater_access.update_one(
+        {"customer_id": customer_oid, "theater_id": staff["theater_id"]},
+        {"$set": {"status": status, "updated_by": staff["user_id"],
+                  "updated_at": datetime.now(UTC).replace(tzinfo=None)}}, upsert=True)
+    log_audit("CUSTOMER_THEATER_ACCESS_UPDATED", "customer", customer_oid, f"Local status {status}")
+    flash("Customer details and theater access updated.", "success")
     return redirect(url_for("staff.customers_list"))
 
 @staff_bp.route("/staff/customers/<customer_id>/delete", methods=["POST"])
 @role_required("staff")
 def customer_delete(customer_id):
     db = get_db()
-    customer_oid = ObjectId(customer_id)
-    if db.bookings.count_documents({"customer_id": customer_oid}):
-        flash("Customer has booking history; deactivate instead of deleting.", "warning")
-    else:
-        db.customers.delete_one({"user_id": customer_oid})
-        db.users.delete_one({"_id": customer_oid, "role": "customer"})
-        flash("Customer deleted.", "success")
+    staff = _staff_profile()
+    customer = _scoped_customer(db, staff["theater_id"], customer_id) if staff else None
+    if not customer:
+        abort(404)
+    now = datetime.now(UTC).replace(tzinfo=None)
+    db.customer_theater_access.update_one(
+        {"customer_id": customer["_id"], "theater_id": staff["theater_id"]},
+        {"$set": {"status": "inactive", "updated_by": staff["user_id"], "updated_at": now}}, upsert=True)
+    log_audit("CUSTOMER_THEATER_ACCESS_REVOKED", "customer", customer["_id"], "History retained")
+    flash("Customer access for this theater was deactivated; account and booking history were retained.", "success")
     return redirect(url_for("staff.customers_list"))
 
 @staff_bp.route("/staff/movies", methods=["GET", "POST"])

@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Reward review — CineSphere{% endblock %}
+{% block content %}
+<div class="container"><header class="page-heading"><span class="eyebrow">Theater-scoped review</span><h1>Worker excellence rewards</h1>
+<p>Compare only workers assigned to this theater. Individual evidence is visible here, not published as a leaderboard.</p></header>
+{% if policy.status != 'active' %}<div class="state-card state-warning"><strong>Policy is {{ policy.status }}</strong><p>Recommendations can be reviewed, but credits cannot be issued until an administrator activates the policy.</p></div>{% endif %}
+<div class="table-card"><div class="table-responsive"><table class="custom-table"><thead><tr><th>Worker</th><th>Attendance</th><th>Verified quality</th><th>Evidence</th><th>Action</th></tr></thead><tbody>
+{% for item in candidates %}<tr><td>{{ item.worker.name }}<br><small>{{ item.worker.department }}</small></td><td>{{ item.evidence.attendance_score if item.evidence.attendance_score is not none else 'N/A' }}</td><td>{{ item.evidence.quality_score if item.evidence.quality_score is not none else 'N/A' }}</td><td>{{ item.evidence.verified_tasks }} verified tasks</td><td>{% if item.evidence.eligible %}<form method="POST" action="{{ url_for('staff.reward_recommend', worker_id=item.worker._id) }}"><input type="hidden" name="cycle" value="{{ item.evidence.cycle }}"><button class="btn btn-sm btn-primary">Recommend</button></form>{% else %}<span class="muted">Insufficient evidence</span>{% endif %}</td></tr>{% endfor %}
+</tbody></table></div></div>
+<section class="table-card"><h2>Recommendations</h2><div class="table-responsive"><table class="custom-table"><thead><tr><th>Worker</th><th>Cycle</th><th>Status</th><th>Independent review</th></tr></thead><tbody>
+{% for award in awards %}<tr><td>{{ award.worker_name }}</td><td>{{ award.cycle }}</td><td>{{ award.status }}</td><td>{% if award.status == 'Recommended' %}<form class="inline-review-form" method="POST" action="{{ url_for('staff.reward_review', award_id=award._id) }}"><input name="reason" required placeholder="Decision reason"><button class="btn btn-success btn-sm" name="decision" value="approve">Approve</button><button class="btn btn-danger btn-sm" name="decision" value="reject">Reject</button></form>{% else %}{{ award.review_reason or '—' }}{% endif %}</td></tr>{% else %}<tr><td colspan="4">No recommendations yet.</td></tr>{% endfor %}
+</tbody></table></div></section></div>
+{% endblock %}

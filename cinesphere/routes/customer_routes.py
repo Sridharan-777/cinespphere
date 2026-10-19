@@ -5,6 +5,8 @@ from werkzeug.security import generate_password_hash
 from cinesphere.models.database import get_db
 from cinesphere.utils.decorators import role_required, login_required
 from cinesphere.utils.audit import log_audit, create_notification
+from cinesphere.services.membership_service import MembershipService
+from cinesphere.services.reward_service import RewardService
 
 customer_bp = Blueprint("customer", __name__)
 
@@ -26,25 +28,39 @@ def live_shows():
 def plans():
     db = get_db()
     uid = ObjectId(session["user_id"])
-    customer = db.customers.find_one({"user_id": uid})
-    current_tier = customer.get("tier", "Free") if customer else "Free"
-    return render_template("customer/plans.html", customer=customer, current_tier=current_tier)
+    customer = db.customers.find_one({"user_id": uid}) or {
+        "user_id": uid, "name": user.get("name", ""), "phone": user.get("phone", ""),
+        "address": "", "city": "", "notification_preferences": {}
+    }
+    customer.setdefault("notification_preferences", {})
+    current_tier, membership = MembershipService.active_membership(customer)
+    return render_template("customer/plans.html", customer=customer, current_tier=current_tier,
+                           membership=membership, plans=MembershipService.plans())
 
 @customer_bp.route("/customer/plans/change", methods=["POST"])
 @role_required("customer")
 def change_plan():
-    new_tier = request.form.get("tier", "Free")
-    if new_tier not in ["Free", "Plus", "Pro"]:
+    new_tier = request.form.get("tier", "FREE").upper()
+    if new_tier not in {"FREE", "PLUS", "PRO"}:
         flash("Invalid membership tier.", "danger")
         return redirect(url_for("customer.plans"))
 
     db = get_db()
     uid = ObjectId(session["user_id"])
-    db.customers.update_one({"user_id": uid}, {"$set": {"tier": new_tier, "plan_updated_at": datetime.now(UTC).replace(tzinfo=None)}})
+    if new_tier != "FREE":
+        plan = MembershipService.plans()[new_tier]
+        if plan.get("status") != "active" or plan.get("price") is None:
+            flash("This paid plan is not commercially configured yet. Your current plan was not changed.", "warning")
+        else:
+            flash("Paid membership activation requires a verified payment. No plan change was made.", "warning")
+        return redirect(url_for("customer.plans"))
+    now = datetime.now(UTC).replace(tzinfo=None)
+    db.customers.update_one({"user_id": uid}, {"$set": {"tier": "Free",
+        "membership": {"tier": "FREE", "status": "active", "started_at": now}, "plan_updated_at": now}})
     
     log_audit("MEMBERSHIP_TIER_CHANGED", "customer", uid, f"Customer changed membership tier to {new_tier}")
-    create_notification(session["user_id"], "Membership Upgraded!", f"Your CineSphere account is now on the {new_tier} tier with exclusive privileges.", "success")
-    flash(f"Congratulations! You are now on the CineSphere {new_tier} plan.", "success")
+    create_notification(session["user_id"], "Membership updated", "Your CineSphere account is now on the Free plan.", "info")
+    flash("Your membership is now on the Free plan.", "success")
     return redirect(url_for("customer.dashboard"))
 
 @customer_bp.route("/customer/dashboard")
@@ -56,7 +72,8 @@ def dashboard():
     
     # Bookings
     bookings = list(db.bookings.find({"customer_id": uid}).sort("created_at", -1))
-    upcoming_booking = next((b for b in bookings if b.get("status") == "Confirmed"), None)
+    today = datetime.now(UTC).replace(tzinfo=None).strftime("%Y-%m-%d")
+    upcoming_booking = next((b for b in bookings if b.get("status") == "Confirmed" and b.get("show_date", "") >= today), None)
     
     # Recommendations: Based on genres customer has watched or top rated movies
     booked_movie_ids = [b["movie_id"] for b in bookings]
@@ -71,7 +88,8 @@ def dashboard():
 
     stats = {
         "total_bookings": len(bookings),
-        "total_spent": sum(b.get("pricing", {}).get("grand_total", 0) for b in bookings),
+        "total_spent": sum(b.get("pricing", {}).get("grand_total", 0) for b in bookings
+                           if b.get("status") in {"Confirmed", "Completed"} and b.get("funding_source", "cash") == "cash"),
         "total_reviews": len(reviews),
         "loyalty_points": customer.get("loyalty_points", 150) if customer else 150,
         "tier": customer.get("tier", "Free") if customer else "Free"
@@ -108,6 +126,16 @@ def cancel_booking(booking_code):
         flash("Booking is already cancelled.", "info")
         return redirect(url_for("customer.my_bookings"))
 
+    try:
+        show_at = datetime.strptime(f"{booking['show_date']} {booking['start_time']}", "%Y-%m-%d %I:%M %p")
+    except (KeyError, TypeError, ValueError):
+        flash("This booking has incomplete schedule data. Contact support for a reviewed cancellation.", "warning")
+        return redirect(url_for("customer.my_bookings"))
+    now = datetime.now(UTC).replace(tzinfo=None)
+    if show_at <= now:
+        flash("This show has started or finished and cannot be cancelled online.", "warning")
+        return redirect(url_for("customer.my_bookings"))
+
     # Release seats in showtime
     db.showtimes.update_one(
         {"_id": booking["showtime_id"]},
@@ -115,29 +143,44 @@ def cancel_booking(booking_code):
     )
 
     # Update Booking status
+    cancellation = {"status": "Cancelled", "cancelled_at": now, "cancelled_by": uid,
+                    "cancellation_reason": request.form.get("reason", "Customer request").strip()[:250]}
+    if booking.get("funding_source") == "cash" and booking.get("payment_id"):
+        cancellation["refund_status"] = "Pending provider review"
     db.bookings.update_one(
         {"_id": booking["_id"]},
-        {"$set": {"status": "Cancelled", "cancelled_at": datetime.now(UTC).replace(tzinfo=None)}}
+        {"$set": cancellation}
     )
 
     db.customers.update_one(
         {"user_id": uid},
         {"$inc": {
             "total_bookings": -1,
-            "total_spent": -booking.get("pricing", {}).get("grand_total", 0)
+            "total_spent": 0
         }}
     )
 
-    # Simulated Refund
+    refund_message = "No cash payment was attached to this booking."
     if booking.get("payment_id"):
         db.payments.update_one(
             {"_id": booking["payment_id"]},
-            {"$set": {"status": "Refunded", "refunded_at": datetime.now(UTC).replace(tzinfo=None)}}
+            {"$set": {"status": "Refund Pending", "refund_requested_at": now}}
         )
+        db.refunds.update_one({"booking_id": booking["_id"]}, {"$setOnInsert": {
+            "booking_id": booking["_id"], "payment_id": booking["payment_id"],
+            "customer_id": uid, "amount": booking.get("pricing", {}).get("grand_total", 0),
+            "status": "Pending", "reason": cancellation["cancellation_reason"], "created_at": now}}, upsert=True)
+        refund_message = "A refund request is pending provider confirmation."
+    elif booking.get("reward_credit_id") and RewardService.policy().get("restore_credit_on_permitted_cancellation"):
+        restored = db.reward_credits.update_one({"_id": booking["reward_credit_id"], "status": "consumed",
+            "booking_id": booking["_id"], "expires_at": {"$gt": now}}, {"$set": {"status": "available",
+            "restored_at": now, "restored_reason": "Permitted booking cancellation"},
+            "$unset": {"booking_id": "", "consumed_at": ""}})
+        refund_message = "The admission credit was restored." if restored.modified_count else "The expired admission credit was not restored."
 
     log_audit("BOOKING_CANCELLED", "booking", booking["_id"], f"Customer cancelled booking {booking_code}")
-    create_notification(session["user_id"], "Booking Cancelled", f"Your booking {booking_code} has been cancelled and a full refund has been initiated.", "warning")
-    flash(f"Booking {booking_code} successfully cancelled and refunded.", "success")
+    create_notification(session["user_id"], "Booking cancelled", f"Booking {booking_code} was cancelled. {refund_message}", "warning")
+    flash(f"Booking {booking_code} was cancelled. {refund_message}", "success")
     return redirect(url_for("customer.my_bookings"))
 
 @customer_bp.route("/customer/favorites")
@@ -227,13 +270,22 @@ def profile():
     db = get_db()
     uid = ObjectId(session["user_id"])
     user = db.users.find_one({"_id": uid})
-    customer = db.customers.find_one({"user_id": uid})
+    customer = db.customers.find_one({"user_id": uid}) or {
+        "user_id": uid, "name": user.get("name", ""), "phone": user.get("phone", ""),
+        "address": "", "city": "", "notification_preferences": {}
+    }
+    customer.setdefault("notification_preferences", {})
 
     if request.method == "POST":
         name = request.form.get("name", "").strip()
         phone = request.form.get("phone", "").strip()
         address = request.form.get("address", "").strip()
         city = request.form.get("city", "").strip()
+        notification_preferences = {
+            "email_show_alerts": bool(request.form.get("email_show_alerts")),
+            "email_booking_updates": bool(request.form.get("email_booking_updates")),
+            "in_app_updates": bool(request.form.get("in_app_updates")),
+        }
 
         db.users.update_one({"_id": uid}, {"$set": {"name": name, "phone": phone, "updated_at": datetime.now(UTC).replace(tzinfo=None)}})
         db.customers.update_one({"user_id": uid}, {"$set": {
@@ -241,17 +293,18 @@ def profile():
             "phone": phone,
             "address": address,
             "city": city,
+            "notification_preferences": notification_preferences,
             "updated_at": datetime.now(UTC).replace(tzinfo=None)
         }})
 
         # Check password change
         new_pwd = request.form.get("new_password", "").strip()
         if new_pwd:
-            if len(new_pwd) >= 6:
+            if len(new_pwd) >= 10:
                 db.users.update_one({"_id": uid}, {"$set": {"password_hash": generate_password_hash(new_pwd)}})
                 flash("Profile and password updated successfully!", "success")
             else:
-                flash("Password must be at least 6 characters.", "warning")
+                flash("Password must be at least 10 characters.", "warning")
         else:
             flash("Profile updated successfully!", "success")
 
@@ -310,3 +363,32 @@ def redeem_reward():
         flash("Not enough loyalty points.", "danger")
         
     return redirect(url_for("customer.rewards"))
+
+
+@customer_bp.route("/customer/support", methods=["GET", "POST"])
+@role_required("customer")
+def support():
+    db = get_db()
+    uid = ObjectId(session["user_id"])
+    if request.method == "POST":
+        booking_code = request.form.get("booking_code", "").strip().upper()
+        booking = db.bookings.find_one({"booking_code": booking_code, "customer_id": uid}) if booking_code else None
+        if booking_code and not booking:
+            flash("That booking does not belong to your account.", "danger")
+            return redirect(url_for("customer.support"))
+        subject = request.form.get("subject", "").strip()
+        message = request.form.get("message", "").strip()
+        if not subject or not message:
+            flash("Subject and message are required.", "danger")
+        else:
+            now = datetime.now(UTC).replace(tzinfo=None)
+            result = db.support_tickets.insert_one({"customer_id": uid, "booking_id": booking.get("_id") if booking else None,
+                "theater_id": booking.get("theater_id") if booking else None, "subject": subject[:150],
+                "priority": "Normal", "status": "Open", "messages": [{"author_id": uid, "author_role": "customer",
+                "body": message[:3000], "created_at": now}], "created_at": now, "updated_at": now})
+            log_audit("SUPPORT_TICKET_CREATED", "support_ticket", result.inserted_id, subject[:150])
+            flash("Support ticket created.", "success")
+        return redirect(url_for("customer.support"))
+    tickets = list(db.support_tickets.find({"customer_id": uid}).sort("updated_at", -1))
+    bookings = list(db.bookings.find({"customer_id": uid}).sort("created_at", -1).limit(50))
+    return render_template("customer/support.html", tickets=tickets, bookings=bookings)

@@ -8,6 +8,8 @@ from cinesphere.utils.decorators import role_required
 from cinesphere.services.report_service import ReportService
 from cinesphere.services.tmdb_service import tmdb_service
 from cinesphere.utils.audit import log_audit
+from cinesphere.services.reward_service import RewardService
+from cinesphere.services.payroll_service import PayrollService
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -452,6 +454,110 @@ def audit_logs():
     logs = list(db.audit_logs.find().sort("created_at", -1).limit(100))
     return render_template("admin/audit_logs.html", logs=logs)
 
+
+@admin_bp.route("/admin/rewards")
+@role_required("admin")
+def rewards_management():
+    db = get_db()
+    awards = list(db.reward_awards.find().sort([("cycle", -1), ("created_at", -1)]).limit(200))
+    credits = list(db.reward_credits.find().sort("issued_at", -1).limit(200))
+    return render_template("admin/rewards.html", policy=RewardService.policy(), awards=awards, credits=credits)
+
+
+@admin_bp.route("/admin/rewards/policy", methods=["POST"])
+@role_required("admin")
+def reward_policy_update():
+    try:
+        policy = {
+            "status": request.form.get("status", "draft"),
+            "cycle": request.form.get("cycle", "monthly"),
+            "credits_per_award": int(request.form.get("credits_per_award", 3)),
+            "credit_valid_days": int(request.form.get("credit_valid_days", 90)),
+            "attendance_threshold": float(request.form.get("attendance_threshold", 95)),
+            "maintenance_quality_threshold": float(request.form.get("maintenance_quality_threshold", 90)),
+            "minimum_verified_tasks": int(request.form.get("minimum_verified_tasks", 5)),
+            "attendance_weight": float(request.form.get("attendance_weight", .5)),
+            "quality_weight": float(request.form.get("quality_weight", .5)),
+            "tie_policy": request.form.get("tie_policy", "approve_all_above_threshold_within_configured_award_limit").strip(),
+            "eligible_seat_categories": request.form.getlist("eligible_seat_categories") or ["Regular"],
+            "restore_credit_on_permitted_cancellation": bool(request.form.get("restore_credit_on_permitted_cancellation")),
+        }
+    except (TypeError, ValueError):
+        flash("Policy values must be valid numbers.", "danger")
+        return redirect(url_for("admin.rewards_management"))
+    if policy["status"] not in {"draft", "active", "paused"} or policy["cycle"] not in {"monthly", "quarterly"} \
+            or not 1 <= policy["credits_per_award"] <= 10 or not 1 <= policy["credit_valid_days"] <= 365 \
+            or not 0 <= policy["attendance_threshold"] <= 100 or not 0 <= policy["maintenance_quality_threshold"] <= 100 \
+            or abs(policy["attendance_weight"] + policy["quality_weight"] - 1) > .001 or not policy["tie_policy"]:
+        flash("Policy values are outside the safe configurable limits or weights do not total 1.", "danger")
+        return redirect(url_for("admin.rewards_management"))
+    now = datetime.now(UTC).replace(tzinfo=None)
+    get_db().system_config.update_one({"key": "worker_reward_policy"}, {"$set": {
+        "policy": policy, "updated_at": now, "updated_by": ObjectId(session["user_id"])}}, upsert=True)
+    log_audit("REWARD_POLICY_UPDATED", "system_config", "worker_reward_policy", f"Policy set to {policy['status']}")
+    flash("Reward policy saved with an audit entry.", "success")
+    return redirect(url_for("admin.rewards_management"))
+
+
+@admin_bp.route("/admin/payroll")
+@role_required("admin")
+def payroll_management():
+    records = list(get_db().payroll.find().sort([("period", -1), ("created_at", -1)]).limit(250))
+    return render_template("admin/payroll.html", records=records, policy=PayrollService.policy())
+
+
+@admin_bp.route("/admin/payroll/<record_id>/approve", methods=["POST"])
+@role_required("admin")
+def payroll_approve(record_id):
+    db = get_db()
+    try:
+        record = db.payroll.find_one({"_id": ObjectId(record_id)})
+    except Exception:
+        record = None
+    reason = request.form.get("reason", "").strip()
+    approver = ObjectId(session["user_id"])
+    if not record or record.get("status") != "Draft":
+        flash("Only a valid draft can be approved.", "danger")
+    elif record.get("calculated_by") == approver:
+        flash("The payroll calculator cannot approve the same record.", "danger")
+    elif not reason:
+        flash("An approval reason is required.", "danger")
+    else:
+        now = datetime.now(UTC).replace(tzinfo=None)
+        db.payroll.update_one({"_id": record["_id"], "status": "Draft"}, {"$set": {
+            "status": "Approved", "approved_by": approver, "approved_at": now, "approval_reason": reason}})
+        log_audit("PAYROLL_APPROVED", "payroll", record["_id"], reason)
+        flash("Payroll approved. This does not transfer money.", "success")
+    return redirect(url_for("admin.payroll_management"))
+
+
+@admin_bp.route("/admin/payroll/<record_id>/record-payment", methods=["POST"])
+@role_required("admin")
+def payroll_record_payment(record_id):
+    db = get_db()
+    actor = db.users.find_one({"_id": ObjectId(session["user_id"]), "status": "active"})
+    try:
+        record = db.payroll.find_one({"_id": ObjectId(record_id)})
+    except Exception:
+        record = None
+    reference = request.form.get("reference", "").strip()
+    method = request.form.get("method", "").strip()
+    paid_date = request.form.get("paid_date", "").strip()
+    if not actor or "payroll_payout" not in actor.get("permissions", []):
+        flash("Your account does not have the separate payroll payout-recording permission.", "danger")
+    elif not record or record.get("status") != "Approved" or record.get("approved_by") == actor["_id"]:
+        flash("A different authorized person must record payment for an approved payroll.", "danger")
+    elif not reference or not method or not paid_date:
+        flash("Payment date, method, and reference are required.", "danger")
+    else:
+        now = datetime.now(UTC).replace(tzinfo=None)
+        db.payroll.update_one({"_id": record["_id"], "status": "Approved"}, {"$set": {
+            "status": "Paid (recorded)", "payment_recorded_by": actor["_id"], "payment_recorded_at": now,
+            "payment_date": paid_date, "payment_method": method, "payment_reference": reference}})
+        log_audit("PAYROLL_PAYMENT_RECORDED", "payroll", record["_id"], f"Manual reference {reference}")
+        flash("Manual payment record saved. CineSphere did not transfer funds.", "success")
+    return redirect(url_for("admin.payroll_management"))
+
 @admin_bp.route("/admin/users")
 @role_required("admin")
 def users_list():
@@ -518,6 +624,10 @@ def user_edit(user_id):
         return redirect(url_for("admin.users_list"))
     if str(object_id) == session.get("user_id") and status != "active":
         flash("You cannot deactivate your own administrator account.", "danger")
+        return redirect(url_for("admin.users_list"))
+    if user.get("role") == "admin" and user.get("status") == "active" and status != "active" \
+            and db.users.count_documents({"role": "admin", "status": "active"}) <= 1:
+        flash("The final active administrator cannot be deactivated.", "danger")
         return redirect(url_for("admin.users_list"))
     if db.users.find_one({"email": email, "_id": {"$ne": object_id}}):
         flash("Another user already uses this email address.", "danger")
@@ -673,11 +783,14 @@ def operations_worker_update(worker_id):
 @admin_bp.route("/admin/operations/workers/<worker_id>/delete", methods=["POST"])
 @role_required("admin")
 def operations_worker_delete(worker_id):
-    db = get_db(); oid = ObjectId(worker_id)
-    db.tasks.delete_many({"assigned_worker_id": oid}); db.attendance.delete_many({"worker_id": oid})
-    db.reward_transactions.delete_many({"user_id": oid}); db.user_sessions.delete_many({"user_id": oid})
-    db.users.delete_one({"_id": oid, "role": "worker"})
-    flash("Worker and linked operational records deleted.", "success"); return redirect(url_for("admin.operations"))
+    db = get_db(); oid = ObjectId(worker_id); now = datetime.now(UTC).replace(tzinfo=None)
+    result = db.users.update_one({"_id": oid, "role": "worker"}, {"$set": {"status": "inactive", "deactivated_at": now}})
+    if result.modified_count:
+        db.user_sessions.update_many({"user_id": oid, "status": "active"}, {"$set": {"status": "revoked", "logout_at": now}})
+        log_audit("ADMIN_DEACTIVATE_WORKER", "worker", oid, request.form.get("reason", "Administrative deactivation"))
+        flash("Worker deactivated. Attendance, task, payroll, and reward history was preserved.", "success")
+    else: flash("Worker not found or already inactive.", "warning")
+    return redirect(url_for("admin.operations"))
 
 @admin_bp.route("/admin/operations/attendance/create", methods=["POST"])
 @role_required("admin")
@@ -692,8 +805,16 @@ def operations_attendance_create():
 @admin_bp.route("/admin/operations/attendance/<record_id>/delete", methods=["POST"])
 @role_required("admin")
 def operations_attendance_delete(record_id):
-    get_db().attendance.delete_one({"_id": ObjectId(record_id)})
-    flash("Attendance deleted.", "success"); return redirect(url_for("admin.operations"))
+    reason = request.form.get("reason", "").strip()
+    if not reason:
+        flash("Attendance corrections require a reason; the original record is preserved.", "danger")
+    else:
+        get_db().attendance.update_one({"_id": ObjectId(record_id)}, {"$set": {"status": "Voided by correction",
+            "correction_reason": reason, "corrected_by": ObjectId(session["user_id"]),
+            "corrected_at": datetime.now(UTC).replace(tzinfo=None)}})
+        log_audit("ADMIN_CORRECT_ATTENDANCE", "attendance", record_id, reason)
+        flash("Attendance record voided with correction history.", "success")
+    return redirect(url_for("admin.operations"))
 
 @admin_bp.route("/admin/operations/tasks/create", methods=["POST"])
 @role_required("admin")
@@ -716,20 +837,23 @@ def operations_task_update(task_id):
 @admin_bp.route("/admin/operations/tasks/<task_id>/delete", methods=["POST"])
 @role_required("admin")
 def operations_task_delete(task_id):
-    get_db().tasks.delete_one({"_id": ObjectId(task_id)})
-    flash("Task deleted.", "success"); return redirect(url_for("admin.operations"))
+    reason = request.form.get("reason", "").strip() or "Administrative cancellation"
+    get_db().tasks.update_one({"_id": ObjectId(task_id), "status": {"$ne": "Completed"}}, {"$set": {
+        "status": "Cancelled", "cancelled_reason": reason, "cancelled_at": datetime.now(UTC).replace(tzinfo=None)}})
+    log_audit("ADMIN_CANCEL_TASK", "task", task_id, reason)
+    flash("Task cancelled; its history was preserved.", "success"); return redirect(url_for("admin.operations"))
 
 @admin_bp.route("/admin/operations/bookings/<booking_id>", methods=["POST"])
 @role_required("admin")
 def operations_booking_update(booking_id):
-    get_db().bookings.update_one({"_id": ObjectId(booking_id)}, {"$set": {"status": request.form.get("status", "Confirmed")}})
-    flash("Booking updated.", "success"); return redirect(url_for("admin.operations"))
+    flash("Booking financial state cannot be edited directly. Use the audited cancellation/refund workflow.", "danger")
+    return redirect(url_for("admin.operations"))
 
 @admin_bp.route("/admin/operations/bookings/<booking_id>/delete", methods=["POST"])
 @role_required("admin")
 def operations_booking_delete(booking_id):
-    get_db().bookings.delete_one({"_id": ObjectId(booking_id)})
-    flash("Booking deleted.", "success"); return redirect(url_for("admin.operations"))
+    flash("Bookings are historical financial records and cannot be deleted from the dashboard.", "danger")
+    return redirect(url_for("admin.operations"))
 
 @admin_bp.route("/admin/operations/rewards/create", methods=["POST"])
 @role_required("admin")
@@ -746,6 +870,5 @@ def operations_reward_create():
 @admin_bp.route("/admin/operations/rewards/<reward_id>/delete", methods=["POST"])
 @role_required("admin")
 def operations_reward_delete(reward_id):
-    get_db().reward_transactions.delete_one({"_id": ObjectId(reward_id)})
-    flash("Reward transaction log deleted; awarded balance is unchanged.", "success")
+    flash("Reward ledger history cannot be deleted. Record a reasoned adjustment instead.", "danger")
     return redirect(url_for("admin.operations"))

@@ -7,6 +7,7 @@ class RazorpayService:
     def __init__(self, key_id=None, key_secret=None):
         self.key_id = key_id or os.getenv("RAZORPAY_KEY_ID", "")
         self.key_secret = key_secret or os.getenv("RAZORPAY_KEY_SECRET", "")
+        self.webhook_secret = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
         self.client = None
         self.is_configured = bool(self.key_id.startswith(("rzp_test_", "rzp_live_")) and self.key_secret)
         try:
@@ -53,5 +54,21 @@ class RazorpayService:
             except Exception:
                 return False
         return False
+
+    def fetch_verified_payment(self, payment_id):
+        """Return a captured/authorized provider payment or None."""
+        if not self.client or not payment_id:
+            return None
+        try:
+            payment = self.client.payment.fetch(payment_id)
+            return payment if payment.get("status") in {"captured", "authorized"} else None
+        except Exception:
+            return None
+
+    def verify_webhook_signature(self, payload, signature):
+        if not self.webhook_secret or not signature:
+            return False
+        expected = hmac.new(self.webhook_secret.encode("utf-8"), payload, hashlib.sha256).hexdigest()
+        return hmac.compare_digest(expected, signature)
 
 razorpay_service = RazorpayService()

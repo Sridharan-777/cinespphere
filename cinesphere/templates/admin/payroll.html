@@ -1,0 +1,7 @@
+{% extends "base.html" %}{% block title %}Payroll governance — CineSphere{% endblock %}{% block content %}
+<div class="container"><header class="page-heading"><span class="eyebrow">Separation of duties</span><h1>Payroll approvals</h1><p>Calculation, approval, and manual payment recording are distinct. Recording Paid never executes a transfer.</p></header>
+<div class="table-card"><div class="table-responsive"><table class="custom-table"><thead><tr><th>Worker</th><th>Period</th><th>Net</th><th>Status</th><th>Controlled action</th></tr></thead><tbody>{% for record in records %}<tr><td>{{ record.worker_name }}</td><td>{{ record.period }}</td><td>₹{{ record.net_pay }}</td><td>{{ record.status }}</td><td>
+{% if record.status == 'Draft' %}<form class="inline-form" method="POST" action="{{ url_for('admin.payroll_approve', record_id=record._id) }}"><input name="reason" required placeholder="Approval reason"><button class="btn btn-success btn-sm">Approve</button></form>
+{% elif record.status == 'Approved' %}<form class="inline-review-form" method="POST" action="{{ url_for('admin.payroll_record_payment', record_id=record._id) }}"><input type="date" name="paid_date" required><input name="method" required placeholder="Manual method"><input name="reference" required placeholder="External reference"><button class="btn btn-primary btn-sm">Record paid</button></form>
+{% else %}{{ record.calculation_note }}{% endif %}</td></tr>{% else %}<tr><td colspan="5">No payroll records.</td></tr>{% endfor %}</tbody></table></div></div></div>
+{% endblock %}

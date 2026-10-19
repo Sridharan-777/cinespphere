@@ -7,7 +7,7 @@
   <h2>Add Customer</h2>
   <form action="{{ url_for('staff.customer_create') }}" method="POST" class="crud-form-grid">
    <input class="form-control" name="name" placeholder="Name" required><input class="form-control" type="email" name="email" placeholder="Email" required>
-   <input class="form-control" name="phone" placeholder="Phone"><input class="form-control" type="password" name="password" value="Customer@1234" required>
+   <input class="form-control" name="phone" placeholder="Phone"><input class="form-control" type="password" name="password" minlength="10" placeholder="Temporary password (10+ characters)" required>
    <button class="btn btn-primary">Create Customer</button>
   </form>
  </div>
@@ -18,7 +18,7 @@
    <input class="form-control" name="name" value="{{ c.name }}" required><input class="form-control" name="email" value="{{ c.email }}" required>
    <select class="form-control" name="status"><option {% if c.status == 'active' %}selected{% endif %}>active</option><option {% if c.status == 'inactive' %}selected{% endif %}>inactive</option></select><button class="btn btn-sm btn-primary">Save</button>
   </form>
-  <form action="{{ url_for('staff.customer_delete', customer_id=c._id) }}" method="POST" onsubmit="return confirm('Delete this customer?');"><button class="btn btn-sm btn-danger">Delete</button></form>
+  <form action="{{ url_for('staff.customer_delete', customer_id=c._id) }}" method="POST" onsubmit="return confirm('Deactivate this customer for your theater? Their account and history will remain.');"><button class="btn btn-sm btn-danger">Deactivate here</button></form>
  </td></tr>{% else %}<tr><td colspan="4">No customers found.</td></tr>{% endfor %}
  </tbody></table></div>
 </div>

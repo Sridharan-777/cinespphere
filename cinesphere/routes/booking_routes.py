@@ -1,15 +1,43 @@
 ﻿from flask import Blueprint, render_template, request, redirect, url_for, flash, session, abort, jsonify
 from bson import ObjectId
 from datetime import UTC, datetime
+from pymongo.errors import DuplicateKeyError
 from cinesphere.models.database import get_db
 from cinesphere.models.worker_model import find_worker
 from cinesphere.utils.decorators import login_required, role_required
 from cinesphere.services.booking_service import BookingService
 from cinesphere.services.razorpay_service import razorpay_service
 from cinesphere.services.stripe_service import stripe_service
+from cinesphere.services.reward_service import RewardService
+from cinesphere.services.membership_service import MembershipService
+from cinesphere.services.ticket_service import TicketService
 from cinesphere.utils.audit import log_audit, create_notification
 
 booking_bp = Blueprint("booking", __name__)
+
+
+@booking_bp.route("/webhooks/razorpay", methods=["POST"])
+def razorpay_webhook():
+    payload = request.get_data(cache=True)
+    signature = request.headers.get("X-Razorpay-Signature", "")
+    if not razorpay_service.verify_webhook_signature(payload, signature):
+        return jsonify({"ok": False}), 401
+    event = request.get_json(silent=True) or {}
+    event_id = request.headers.get("X-Razorpay-Event-Id") or event.get("id")
+    if not event_id:
+        return jsonify({"ok": False, "error": "Missing event identifier"}), 400
+    db = get_db()
+    try:
+        db.payment_events.insert_one({"event_id": event_id, "event": event.get("event"),
+            "received_at": datetime.now(UTC).replace(tzinfo=None)})
+    except DuplicateKeyError:
+        return jsonify({"ok": True, "duplicate": True})
+    payment = (((event.get("payload") or {}).get("payment") or {}).get("entity") or {})
+    if event.get("event") == "payment.failed" and payment.get("order_id"):
+        db.payment_intents.update_one({"provider_order_id": payment["order_id"], "status": "pending"},
+            {"$set": {"status": "failed", "failure_code": payment.get("error_code") or "provider_failed",
+                      "failed_at": datetime.now(UTC).replace(tzinfo=None)}})
+    return jsonify({"ok": True})
 
 @booking_bp.route("/booking/<showtime_id>")
 def start_booking(showtime_id):
@@ -33,27 +61,21 @@ def select_seats(showtime_id):
     booked_seats = showtime.get("booked_seats", [])
 
     # Customer tier check for discount (Plus = 10%, Pro = 20%)
-    customer_tier = "Free"
+    customer_tier = "FREE"
     employee_benefits = None
     if session.get("user_id"):
         cust = db.customers.find_one({"user_id": ObjectId(session["user_id"])})
         if cust:
-            customer_tier = cust.get("tier", "Free")
+            customer_tier, _ = MembershipService.active_membership(cust)
         elif session.get("role") == "worker":
-            month_key = datetime.now(UTC).replace(tzinfo=None).strftime("%Y-%m")
-            used = list(db.bookings.find({
-                "customer_id": ObjectId(session["user_id"]),
-                "employee_benefit.month": month_key,
-                "status": {"$ne": "Cancelled"}
-            }))
-            free_used = sum(len(b.get("seats", [])) for b in used
-                            if b.get("employee_benefit", {}).get("type") == "free_pass")
-            family_used = sum(len(b.get("seats", [])) for b in used
-                              if b.get("employee_benefit", {}).get("type") == "family_discount")
+            now = datetime.now(UTC).replace(tzinfo=None)
+            available = db.reward_credits.count_documents({"worker_id": ObjectId(session["user_id"]),
+                "status": "available", "expires_at": {"$gt": now}})
             employee_benefits = {
-                "free_remaining": max(0, 2 - free_used),
-                "family_remaining": max(0, 4 - family_used),
-                "month": month_key
+                "available_credits": available,
+                "free_remaining": available,
+                "family_remaining": 0,
+                "policy_status": RewardService.policy().get("status", "draft")
             }
 
     # Screen seat layout: Rows A to H, seats 1 to 8 (64 seats)
@@ -87,6 +109,7 @@ def select_seats(showtime_id):
                            seat_layout=seat_layout,
                            base_price=showtime.get("base_price", 200),
                            customer_tier=customer_tier,
+                           membership_plan=MembershipService.plans()[customer_tier],
                            employee_benefits=employee_benefits,
                            razorpay_key_id=razorpay_service.key_id,
                            payment_configured=razorpay_service.is_configured)
@@ -100,65 +123,43 @@ def book_employee_benefit(showtime_id):
     if not worker:
         return jsonify({"success": False, "error": "Only active workers can use employee movie benefits."}), 403
 
-    benefit_type = request.form.get("benefit_type", "")
-    if benefit_type not in {"free_pass", "family_discount"}:
-        return jsonify({"success": False, "error": "Choose a valid employee benefit."}), 400
-
     seat_numbers = [s.strip().upper() for s in request.form.get("selected_seats", "").split(",") if s.strip()]
-    if not seat_numbers:
-        return jsonify({"success": False, "error": "Please select at least one seat."}), 400
-    valid_seats = {f"{row}{number}" for row in "ABCDEF" for number in range(1, 9)}
-    if len(seat_numbers) != len(set(seat_numbers)) or any(seat not in valid_seats for seat in seat_numbers):
-        return jsonify({"success": False, "error": "One or more selected seats are invalid."}), 400
-
-    month_key = datetime.now(UTC).replace(tzinfo=None).strftime("%Y-%m")
-    prior = list(db.bookings.find({
-        "customer_id": uid,
-        "employee_benefit.month": month_key,
-        "employee_benefit.type": benefit_type,
-        "status": {"$ne": "Cancelled"}
-    }))
-    used = sum(len(b.get("seats", [])) for b in prior)
-    allowance = 2 if benefit_type == "free_pass" else 4
-    if len(seat_numbers) > allowance - used:
-        label = "free-pass" if benefit_type == "free_pass" else "family-discount"
-        return jsonify({"success": False, "error": f"Only {max(0, allowance - used)} {label} ticket(s) remain this month."}), 400
-
-    try:
-        showtime = db.showtimes.find_one({"_id": ObjectId(showtime_id)})
-    except Exception:
-        showtime = None
-    screen = db.screens.find_one({"_id": showtime["screen_id"]}) if showtime else None
-    if not showtime or not screen:
-        return jsonify({"success": False, "error": "Showtime not found."}), 404
-
-    seats = []
-    for number in seat_numbers:
-        row = number[0].upper()
-        seat_type = "VIP" if row in {"E", "F"} else ("Premium" if row in {"C", "D"} else "Regular")
-        seats.append({"seat_number": number, "type": seat_type})
-    standard = BookingService.calculate_price(showtime.get("base_price", 200), seats, screen.get("screen_type", "Standard"))
-    discount = standard["grand_total"] if benefit_type == "free_pass" else round(standard["subtotal"] * 0.25)
-    final_total = max(0, standard["grand_total"] - discount)
-    pricing_override = {
-        "discount_amount": discount,
-        "discount_label": "Employee free pass" if benefit_type == "free_pass" else "Worker family discount (25%)",
-        "grand_total": final_total
-    }
+    if len(seat_numbers) != 1:
+        return jsonify({"success": False, "error": "Each reward credit covers one personal admission."}), 400
+    quote, error = BookingService.quote(str(uid), showtime_id, seat_numbers)
+    if error:
+        return jsonify({"success": False, "error": error}), 400
+    if quote["seats"][0]["type"] != "Regular":
+        return jsonify({"success": False, "error": "This reward currently covers Regular seats only."}), 400
+    credit, error = RewardService.reserve_credit(uid, showtime_id)
+    if error:
+        return jsonify({"success": False, "error": error}), 400
+    hold, error = BookingService.reserve_seats(str(uid), showtime_id, seat_numbers)
+    if error:
+        RewardService.release_credit(credit["_id"], credit["reservation_id"])
+        return jsonify({"success": False, "error": error}), 409
+    pricing_override = {"discount_amount": quote["grand_total"], "discount_label": "Worker excellence reward",
+                        "grand_total": 0, "employer_funded_value": quote["grand_total"]}
     booking, err = BookingService.create_booking(
-        str(uid), showtime_id, seat_numbers, "Employee Benefit",
+        str(uid), showtime_id, seat_numbers, "Worker Reward",
         pricing_override=pricing_override,
         booking_metadata={
             "booking_owner_role": "worker",
-            "employee_benefit": {"type": benefit_type, "month": month_key, "worker_id": worker["_id"]},
-            "is_virtual_ticket_generated": True
-        }
+            "reward_credit_id": credit["_id"], "reward_reservation_id": credit["reservation_id"],
+            "hold_id": hold["hold_id"], "employer_funded_value": quote["grand_total"]
+        }, funding_source="worker_reward",
+        payment_verification={"hold_id": hold["hold_id"]}
     )
     if err:
+        BookingService.release_hold(hold["hold_id"])
+        RewardService.release_credit(credit["_id"], credit["reservation_id"])
         return jsonify({"success": False, "error": err}), 400
 
+    if not RewardService.consume_credit(credit["_id"], credit["reservation_id"], booking["_id"], quote["grand_total"]):
+        db.bookings.update_one({"_id": booking["_id"]}, {"$set": {"reward_ledger_status": "needs_review"}})
+
     log_audit("EMPLOYEE_BENEFIT_BOOKING", "booking", booking["_id"],
-              f"Worker {worker.get('name', '')} used {benefit_type} for {len(seat_numbers)} ticket(s)")
+              f"Worker {worker.get('name', '')} redeemed one approved admission credit")
     return jsonify({
         "success": True,
         "message": f"Employee benefit applied. Ticket {booking['booking_code']} is ready.",
@@ -173,32 +174,13 @@ def create_razorpay_order(showtime_id):
     if not seats_selected_str:
         return jsonify({"success": False, "error": "No seats selected"}), 400
 
-    seat_numbers = [s.strip() for s in seats_selected_str.split(",") if s.strip()]
+    seat_numbers = [s.strip().upper() for s in seats_selected_str.split(",") if s.strip()]
     db = get_db()
-    showtime = db.showtimes.find_one({"_id": ObjectId(showtime_id)})
-    if not showtime:
-        return jsonify({"success": False, "error": "Showtime not found"}), 404
-
-    # Calculate pricing
-    screen = db.screens.find_one({"_id": showtime["screen_id"]})
-    seats_data = []
-    for s_code in seat_numbers:
-        row = s_code[0].upper()
-        s_type = "VIP" if row in ["E", "F"] else ("Premium" if row in ["C", "D"] else "Regular")
-        seats_data.append({"seat_number": s_code, "type": s_type})
-
-    pricing = BookingService.calculate_price(
-        base_price=showtime.get("base_price", 200),
-        seats=seats_data,
-        screen_type=screen.get("screen_type", "Standard") if screen else "Standard"
-    )
-
-    # Membership Tier Discount
-    cust = db.customers.find_one({"user_id": ObjectId(session.get("user_id"))})
-    tier = cust.get("tier", "Free") if cust else "Free"
-    discount_pct = 0.20 if tier == "Pro" else (0.10 if tier == "Plus" else 0.0)
-    discount_amount = round(pricing["subtotal"] * discount_pct)
-    grand_total = max(1, pricing["grand_total"] - discount_amount)
+    hold, error = BookingService.reserve_seats(session["user_id"], showtime_id, seat_numbers)
+    if error:
+        return jsonify({"success": False, "error": error}), 409
+    pricing = hold["pricing"]
+    grand_total = pricing["grand_total"]
 
     receipt_id = f"REC_{showtime_id[-6:]}_{int(datetime.now(UTC).replace(tzinfo=None).timestamp())}"
     order, err = razorpay_service.create_order(
@@ -206,64 +188,38 @@ def create_razorpay_order(showtime_id):
         receipt_id=receipt_id,
         notes={
             "showtime_id": showtime_id,
-            "seats": seats_selected_str,
+            "hold_id": hold["hold_id"],
             "user_id": session.get("user_id"),
-            "tier": tier
+            "membership_tier": pricing.get("membership_tier", "FREE")
         }
     )
 
     if err:
-        return jsonify({"success": False, "error": err}), 500
+        BookingService.release_hold(hold["hold_id"])
+        return jsonify({"success": False, "error": err}), 503
+
+    now = datetime.now(UTC).replace(tzinfo=None)
+    db.payment_intents.insert_one({"provider": "razorpay", "provider_order_id": order["id"],
+        "customer_id": ObjectId(session["user_id"]), "showtime_id": ObjectId(showtime_id),
+        "seat_numbers": seat_numbers, "hold_id": hold["hold_id"], "amount": grand_total,
+        "amount_minor": int(grand_total * 100), "currency": "INR", "pricing": pricing,
+        "status": "pending", "expires_at": hold["expires_at"], "created_at": now})
 
     return jsonify({
         "success": True,
         "order": order,
         "key_id": razorpay_service.key_id,
         "grand_total": grand_total,
-        "discount_amount": discount_amount,
-        "tier": tier,
+        "discount_amount": pricing.get("discount_amount", 0),
+        "tier": pricing.get("membership_tier", "FREE"),
         "currency": "INR"
     })
 
 @booking_bp.route("/booking/<showtime_id>/book-direct", methods=["POST"])
 @role_required("customer")
 def book_direct(showtime_id):
-    seats_selected_str = request.form.get("selected_seats", "").strip()
-    if not seats_selected_str:
-        return jsonify({"success": False, "error": "Please select at least one seat to proceed."}), 400
-
-    seat_numbers = [s.strip() for s in seats_selected_str.split(",") if s.strip()]
-    customer_id = session.get("user_id")
-
-    # Create a direct booking when the online payment gateway is unavailable.
-    booking, err = BookingService.create_booking(customer_id, showtime_id, seat_numbers, "Direct Booking")
-    if err:
-        return jsonify({"success": False, "error": err}), 400
-
-    # Set as virtual ticket generated
-    db = get_db()
-    db.bookings.update_one(
-        {"_id": booking["_id"]},
-        {"$set": {
-            "is_virtual_ticket_generated": True
-        }}
-    )
-
-    # Update Customer Loyalty Points
-    db.customers.update_one(
-        {"user_id": ObjectId(customer_id)},
-        {"$inc": {"loyalty_points": 50 * len(seat_numbers)}}
-    )
-
-    # Audit & Notification
-    log_audit("BOOKING_CREATED", "booking", booking["_id"], f"Customer booked {', '.join(seat_numbers)} for {booking['movie_title']}")
-    create_notification(customer_id, "Ticket Confirmed!", f"Your virtual ticket for {booking['movie_title']} ({booking['booking_code']}) is ready.", "success")
-
-    return jsonify({
-        "success": True,
-        "message": f"Booking successful! Ticket {booking['booking_code']} generated.",
-        "redirect_url": url_for("booking.ticket", booking_code=booking["booking_code"])
-    })
+    return jsonify({"success": False, "error":
+        "Online payment is not configured. Seats were not booked and no charge was attempted."}), 503
 
 @booking_bp.route("/booking/<showtime_id>/stripe-success")
 @role_required("customer")
@@ -274,52 +230,19 @@ def stripe_success(showtime_id):
         flash("Invalid payment callback.", "danger")
         return redirect(url_for("booking.select_seats", showtime_id=showtime_id))
 
-    seat_numbers = [s.strip() for s in seats_selected_str.split(",") if s.strip()]
-    customer_id = session.get("user_id")
-
-    # Create Booking
-    booking, err = BookingService.create_booking(customer_id, showtime_id, seat_numbers, "Stripe Checkout")
-    if err:
-        flash(err, "danger")
-        return redirect(url_for("booking.select_seats", showtime_id=showtime_id))
-
-    # Append Stripe Transaction details
-    db = get_db()
-    db.bookings.update_one(
-        {"_id": booking["_id"]},
-        {"$set": {
-            "stripe_session_id": session_id,
-            "is_virtual_ticket_generated": True
-        }}
-    )
-
-    # Update Customer Loyalty Points
-    db.customers.update_one(
-        {"user_id": ObjectId(customer_id)},
-        {"$inc": {"loyalty_points": 50 * len(seat_numbers)}}
-    )
-
-    # Audit & Notification
-    log_audit("BOOKING_CREATED", "booking", booking["_id"], f"Customer booked {', '.join(seat_numbers)} for {booking['movie_title']} via Stripe")
-    create_notification(customer_id, "Ticket Confirmed!", f"Your virtual ticket for {booking['movie_title']} ({booking['booking_code']}) is ready.", "success")
-
-    flash(f"Stripe payment successful! Virtual Ticket {booking['booking_code']} generated.", "success")
-    return redirect(url_for("booking.confirmation", booking_code=booking["booking_code"]))
+    if not stripe_service.verified_checkout(session_id):
+        flash("Stripe did not verify a paid checkout. No booking was created.", "danger")
+    else:
+        flash("This checkout has no matching CineSphere payment intent. Contact support with the Stripe reference.", "warning")
+    return redirect(url_for("booking.select_seats", showtime_id=showtime_id))
 
 @booking_bp.route("/booking/<showtime_id>/checkout", methods=["POST"])
 @role_required("customer")
 def checkout(showtime_id):
-    seats_selected_str = request.form.get("selected_seats", "").strip()
     payment_method = request.form.get("payment_method", "Razorpay Online")
     razorpay_order_id = request.form.get("razorpay_order_id", "")
-    razorpay_payment_id = request.form.get("razorpay_payment_id", f"pay_rzp_{int(datetime.now(UTC).replace(tzinfo=None).timestamp())}")
+    razorpay_payment_id = request.form.get("razorpay_payment_id", "")
     razorpay_signature = request.form.get("razorpay_signature", "")
-
-    if not seats_selected_str:
-        flash("Please select at least one seat to proceed.", "warning")
-        return redirect(url_for("booking.select_seats", showtime_id=showtime_id))
-
-    seat_numbers = [s.strip() for s in seats_selected_str.split(",") if s.strip()]
     customer_id = session.get("user_id")
 
     if not (razorpay_order_id and razorpay_payment_id and razorpay_signature):
@@ -329,14 +252,26 @@ def checkout(showtime_id):
         flash("Payment verification failed. No booking was created.", "danger")
         return redirect(url_for("booking.select_seats", showtime_id=showtime_id))
 
-    # Create Booking
-    booking, err = BookingService.create_booking(customer_id, showtime_id, seat_numbers, payment_method)
+    db = get_db()
+    intent = db.payment_intents.find_one({"provider_order_id": razorpay_order_id,
+        "customer_id": ObjectId(customer_id), "showtime_id": ObjectId(showtime_id)})
+    if not intent:
+        flash("The payment does not match a CineSphere checkout intent. No booking was created.", "danger")
+        return redirect(url_for("booking.select_seats", showtime_id=showtime_id))
+    provider_payment = razorpay_service.fetch_verified_payment(razorpay_payment_id)
+    if not provider_payment or provider_payment.get("order_id") != razorpay_order_id \
+            or int(provider_payment.get("amount", -1)) != int(intent["amount_minor"]) \
+            or str(provider_payment.get("currency", "")).upper() != "INR":
+        flash("The gateway payment status or amount could not be verified. No booking was created.", "danger")
+        return redirect(url_for("booking.select_seats", showtime_id=showtime_id))
+
+    booking, err = BookingService.create_booking(customer_id, showtime_id, intent["seat_numbers"], payment_method,
+        payment_verification={"verified": True, "provider": "razorpay", "order_id": razorpay_order_id,
+                              "idempotency_key": razorpay_payment_id, "hold_id": intent.get("hold_id")})
     if err:
         flash(err, "danger")
         return redirect(url_for("booking.select_seats", showtime_id=showtime_id))
 
-    # Append Razorpay Transaction details
-    db = get_db()
     db.bookings.update_one(
         {"_id": booking["_id"]},
         {"$set": {
@@ -345,15 +280,18 @@ def checkout(showtime_id):
             "is_virtual_ticket_generated": True
         }}
     )
+    db.payment_intents.update_one({"_id": intent["_id"]}, {"$set": {
+        "status": "confirmed", "provider_payment_id": razorpay_payment_id,
+        "booking_id": booking["_id"], "confirmed_at": datetime.now(UTC).replace(tzinfo=None)}})
 
     # Update Customer Loyalty Points
     db.customers.update_one(
         {"user_id": ObjectId(customer_id)},
-        {"$inc": {"loyalty_points": 50 * len(seat_numbers)}}
+        {"$inc": {"loyalty_points": 50 * len(intent["seat_numbers"])}}
     )
 
     # Audit & Notification
-    log_audit("BOOKING_CREATED", "booking", booking["_id"], f"Customer booked {', '.join(seat_numbers)} for {booking['movie_title']} via Razorpay ({razorpay_payment_id})")
+    log_audit("BOOKING_CREATED", "booking", booking["_id"], f"Verified Razorpay booking {booking['booking_code']} ({razorpay_payment_id})")
     create_notification(customer_id, "Ticket Confirmed!", f"Your virtual ticket for {booking['movie_title']} ({booking['booking_code']}) is ready.", "success")
 
     flash(f"Payment successful! Virtual Ticket {booking['booking_code']} generated automatically.", "success")
@@ -370,6 +308,8 @@ def confirmation(booking_code):
     # Authorization check
     if str(booking["customer_id"]) != session.get("user_id") and session.get("role") not in ["admin", "staff"]:
         abort(403)
+    if session.get("role") == "staff" and str(booking.get("theater_id")) != session.get("theater_id"):
+        abort(403)
 
     return render_template("customer/booking_confirmation.html", booking=booking)
 
@@ -383,5 +323,12 @@ def ticket(booking_code):
 
     if str(booking["customer_id"]) != session.get("user_id") and session.get("role") not in ["admin", "staff"]:
         abort(403)
+    if session.get("role") == "staff" and str(booking.get("theater_id")) != session.get("theater_id"):
+        abort(403)
+    if booking.get("status") != "Confirmed":
+        flash("Only confirmed, active bookings have an admission ticket.", "warning")
+        return redirect(url_for("customer.my_bookings"))
 
-    return render_template("customer/ticket.html", booking=booking)
+    admission_token = TicketService.token_for(booking)
+    return render_template("customer/ticket.html", booking=booking, admission_token=admission_token,
+                           qr_data_uri=TicketService.qr_data_uri(admission_token))

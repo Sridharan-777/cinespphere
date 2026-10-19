@@ -35,6 +35,13 @@
             </div>
 
             <div style="border-top: 1px solid var(--border); padding-top: 1.2rem; margin-top: 1.5rem;">
+                <h4 style="font-size: 1rem; margin-bottom: 0.8rem;">Notification preferences</h4>
+                <label class="checkbox-row"><input type="checkbox" name="in_app_updates" {% if customer.notification_preferences.get('in_app_updates', true) %}checked{% endif %}> In-app booking and support updates</label>
+                <label class="checkbox-row"><input type="checkbox" name="email_booking_updates" {% if customer.notification_preferences.get('email_booking_updates', false) %}checked{% endif %}> Email booking updates</label>
+                <label class="checkbox-row"><input type="checkbox" name="email_show_alerts" {% if customer.notification_preferences.get('email_show_alerts', false) %}checked{% endif %}> Email me when followed movies get local shows</label>
+            </div>
+
+            <div style="border-top: 1px solid var(--border); padding-top: 1.2rem; margin-top: 1.5rem;">
                 <h4 style="font-size: 1rem; margin-bottom: 0.8rem;">Change Password</h4>
                 <div class="form-group">
                     <label class="form-label">New Password (leave blank to keep current)</label>

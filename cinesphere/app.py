@@ -4,6 +4,7 @@ from bson import ObjectId
 from flask import Flask, render_template, session, request
 from cinesphere.config import config_by_name
 from cinesphere.models.database import init_db, get_db
+from cinesphere.utils.security import csrf_token, validate_csrf
 
 def create_app(config_name=None):
     if not config_name:
@@ -14,6 +15,7 @@ def create_app(config_name=None):
                 static_folder="static")
     
     app.config.from_object(config_by_name.get(config_name, config_by_name["default"]))
+    app.jinja_env.globals["csrf_token"] = csrf_token
 
     if config_name == "production":
         missing = [name for name in ("SECRET_KEY", "MONGO_URI") if not app.config.get(name)]
@@ -57,6 +59,20 @@ def create_app(config_name=None):
     app.register_blueprint(admin_bp)
     app.register_blueprint(api_bp)
 
+    @app.context_processor
+    def shared_navigation_context():
+        try:
+            cities = sorted(city for city in get_db().theaters.distinct("city", {"status": "active"}) if city)
+        except Exception:
+            cities = []
+        return {"nav_locations": cities, "ai_assistant_configured": bool(app.config.get("AI_PROVIDER_API_KEY"))}
+
+    @app.before_request
+    def protect_browser_mutations():
+        # Provider webhooks use their own signatures and are intentionally not session-CSRF protected.
+        if request.endpoint not in {"booking.razorpay_webhook"}:
+            validate_csrf()
+
     @app.before_request
     def update_active_session_seen_time():
         """Keep a lightweight activity timestamp for authenticated browser sessions."""
@@ -90,6 +106,10 @@ def create_app(config_name=None):
         r.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
         r.headers["Pragma"] = "no-cache"
         r.headers["Expires"] = "0"
+        r.headers["X-Content-Type-Options"] = "nosniff"
+        r.headers["X-Frame-Options"] = "SAMEORIGIN"
+        r.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        r.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
         return r
 
     return app

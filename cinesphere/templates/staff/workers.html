@@ -75,12 +75,11 @@
                                 <input class="form-control" name="department" value="{{ w.department }}" required>
                                 <input class="form-control" name="designation" value="{{ w.designation }}" required>
                                 <input class="form-control" name="shift_timings" value="{{ w.shift_timings }}" required>
-                                <input class="form-control" type="number" name="monthly_salary" value="{{ w.monthly_salary }}" required>
                                 <button class="btn btn-sm btn-primary">Save</button>
                             </form>
                         </details>
-                        <form action="{{ url_for('staff.worker_delete', worker_id=w._id) }}" method="POST" onsubmit="return confirm('Delete this worker and operational records?');">
-                            <button class="btn btn-sm btn-danger">Delete</button>
+                        <form action="{{ url_for('staff.worker_delete', worker_id=w._id) }}" method="POST" onsubmit="return confirm('Deactivate access and retain all operational records?');">
+                            <button class="btn btn-sm btn-danger">Retire access</button>
                         </form>
                     </td>
                 </tr>

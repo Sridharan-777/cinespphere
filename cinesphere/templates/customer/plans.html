@@ -1,113 +1,59 @@
 {% extends "base.html" %}
 
-{% block title %}Membership Plans — Free, Plus, Pro{% endblock %}
+{% block title %}Membership plans — CineSphere{% endblock %}
 
 {% block content %}
-<div class="container" style="max-width: 1100px;">
-    <div style="text-align: center; margin-bottom: 3rem;">
-        <span class="chip" style="background: rgba(229,9,20,0.15); color: var(--primary); font-weight: 700; margin-bottom: 0.5rem; display: inline-block;">
-            CINESPHERE MEMBERSHIP CLUB
-        </span>
-        <h1 style="font-size: 2.6rem; font-family: var(--font-heading); margin-bottom: 0.8rem;">
-            Choose Your Cinematic Privilege Tier
-        </h1>
-        <p style="color: var(--text-muted); font-size: 1.05rem; max-width: 600px; margin: 0 auto;">
-            Unlock instant ticket discounts, zero convenience fees, priority recliner bookings, and VIP lounge access.
-        </p>
+<div class="container membership-page">
+    <header class="page-heading centered">
+        <span class="eyebrow">CineSphere membership</span>
+        <h1>Benefits that stay transparent</h1>
+        <p>Plan values come from authorized configuration. Draft plans cannot be purchased until pricing and payment activation are complete.</p>
+    </header>
+
+    <div class="plan-grid">
+        {% for key, plan in plans.items() %}
+        <article class="plan-card {% if current_tier == key %}is-current{% endif %}">
+            <div class="plan-card-top">
+                <div>
+                    <span class="status-pill status-{{ plan.status }}">{{ plan.status|upper }}</span>
+                    <h2>{{ plan.name }}</h2>
+                </div>
+                {% if current_tier == key %}<span class="current-plan-badge">Current plan</span>{% endif %}
+            </div>
+            <div class="plan-price">
+                {% if key == 'FREE' %}₹0{% elif plan.price is not none %}₹{{ plan.price }}{% else %}Pricing not set{% endif %}
+            </div>
+            <dl class="plan-facts">
+                <div><dt>Ticket saving</dt><dd>{{ plan.ticket_discount_percent }}% up to ₹{{ plan.ticket_discount_cap }}</dd></div>
+                <div><dt>Rewards</dt><dd>{{ plan.reward_multiplier }}× multiplier</dd></div>
+                <div><dt>Food offer</dt><dd>{{ plan.food_discount_percent }}% on eligible items</dd></div>
+            </dl>
+            <ul class="check-list">
+                {% for benefit in plan.benefits %}<li>{{ benefit }}</li>{% endfor %}
+            </ul>
+            {% if current_tier == key %}
+                <button class="btn btn-outline" disabled>Active</button>
+            {% elif key == 'FREE' %}
+                <form action="{{ url_for('customer.change_plan') }}" method="POST">
+                    <input type="hidden" name="tier" value="FREE">
+                    <button class="btn btn-outline" type="submit">Switch to Free</button>
+                </form>
+            {% else %}
+                <form action="{{ url_for('customer.change_plan') }}" method="POST">
+                    <input type="hidden" name="tier" value="{{ key }}">
+                    <button class="btn btn-primary" type="submit" {% if plan.status != 'active' or plan.price is none %}disabled{% endif %}>
+                        {% if plan.status != 'active' or plan.price is none %}Awaiting configuration{% else %}Continue to verified payment{% endif %}
+                    </button>
+                </form>
+            {% endif %}
+        </article>
+        {% endfor %}
     </div>
 
-    <!-- 3 Tier Comparison Cards -->
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.8rem; margin-bottom: 3rem;">
-        
-        <!-- Free Tier -->
-        <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 2rem; display: flex; flex-direction: column; position: relative;">
-            <div style="font-size: 0.85rem; font-weight: 700; color: #a1a1aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.5rem;">Basic Tier</div>
-            <h2 style="font-size: 1.8rem; font-family: var(--font-heading); margin-bottom: 0.5rem;">CineFree</h2>
-            <div style="font-size: 2.2rem; font-weight: 800; font-family: var(--font-heading); margin-bottom: 1.5rem;">
-                ₹0 <span style="font-size: 0.9rem; font-weight: 400; color: var(--text-muted);">/ forever</span>
-            </div>
-            
-            <ul style="list-style: none; padding: 0; margin-bottom: 2rem; display: flex; flex-direction: column; gap: 0.8rem; font-size: 0.92rem; color: #d4d4d8;">
-                <li>✓ Standard Seat Reservations</li>
-                <li>✓ Digital QR E-Tickets</li>
-                <li>✓ Watchlist & Movie Reviews</li>
-                <li style="color: #71717a;">✗ Ticket Discounts (0%)</li>
-                <li style="color: #71717a;">✗ Food & Beverage Savings</li>
-                <li style="color: #71717a;">✗ VIP Lounge Access</li>
-            </ul>
-
-            <div style="margin-top: auto;">
-                {% if current_tier == 'Free' %}
-                <button class="btn btn-outline" style="width: 100%;" disabled>Current Active Plan</button>
-                {% else %}
-                <form action="{{ url_for('customer.change_plan') }}" method="POST">
-                    <input type="hidden" name="tier" value="Free">
-                    <button type="submit" class="btn btn-outline" style="width: 100%;">Switch to Free</button>
-                </form>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- Plus Tier -->
-        <div style="background: var(--bg-card); border: 2px solid #3b82f6; border-radius: 14px; padding: 2rem; display: flex; flex-direction: column; position: relative; box-shadow: 0 10px 30px rgba(59,130,246,0.15);">
-            <div style="position: absolute; top: -12px; right: 24px; background: #3b82f6; color: #fff; font-size: 0.72rem; font-weight: 800; padding: 2px 10px; border-radius: 20px; text-transform: uppercase;">Most Popular</div>
-            <div style="font-size: 0.85rem; font-weight: 700; color: #93c5fd; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.5rem;">Smart Moviegoer</div>
-            <h2 style="font-size: 1.8rem; font-family: var(--font-heading); margin-bottom: 0.5rem;">CinePlus</h2>
-            <div style="font-size: 2.2rem; font-weight: 800; font-family: var(--font-heading); margin-bottom: 1.5rem; color: #93c5fd;">
-                ₹299 <span style="font-size: 0.9rem; font-weight: 400; color: var(--text-muted);">/ year</span>
-            </div>
-            
-            <ul style="list-style: none; padding: 0; margin-bottom: 2rem; display: flex; flex-direction: column; gap: 0.8rem; font-size: 0.92rem; color: #d4d4d8;">
-                <li>✓ <strong>10% Off</strong> on every ticket automatically</li>
-                <li>✓ <strong>2x Loyalty Reward Points</strong></li>
-                <li>✓ Standard + 3D Booking Privileges</li>
-                <li>✓ Digital QR E-Tickets with Priority Gate Entry</li>
-                <li>✓ ₹50 Monthly F&B Snack Coupon</li>
-                <li style="color: #71717a;">✗ Complimentary VIP Recliner Upgrades</li>
-            </ul>
-
-            <div style="margin-top: auto;">
-                {% if current_tier == 'Plus' %}
-                <button class="btn btn-primary" style="width: 100%; background: #3b82f6; border-color: #3b82f6;" disabled>Current Active Plan</button>
-                {% else %}
-                <form action="{{ url_for('customer.change_plan') }}" method="POST">
-                    <input type="hidden" name="tier" value="Plus">
-                    <button type="submit" class="btn btn-primary" style="width: 100%; background: #3b82f6; border-color: #3b82f6;">Upgrade to CinePlus</button>
-                </form>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- Pro Tier -->
-        <div style="background: var(--bg-card); border: 2px solid var(--primary); border-radius: 14px; padding: 2rem; display: flex; flex-direction: column; position: relative; box-shadow: 0 10px 30px rgba(229,9,20,0.2);">
-            <div style="position: absolute; top: -12px; right: 24px; background: var(--primary); color: #fff; font-size: 0.72rem; font-weight: 800; padding: 2px 10px; border-radius: 20px; text-transform: uppercase;">Ultimate VIP</div>
-            <div style="font-size: 0.85rem; font-weight: 700; color: #fca5a5; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.5rem;">Cinephile Elite</div>
-            <h2 style="font-size: 1.8rem; font-family: var(--font-heading); margin-bottom: 0.5rem;">CinePro VIP</h2>
-            <div style="font-size: 2.2rem; font-weight: 800; font-family: var(--font-heading); margin-bottom: 1.5rem; color: var(--primary);">
-                ₹699 <span style="font-size: 0.9rem; font-weight: 400; color: var(--text-muted);">/ year</span>
-            </div>
-            
-            <ul style="list-style: none; padding: 0; margin-bottom: 2rem; display: flex; flex-direction: column; gap: 0.8rem; font-size: 0.92rem; color: #d4d4d8;">
-                <li>✓ <strong>20% Flat Discount</strong> on all bookings & formats</li>
-                <li>✓ <strong>ZERO Convenience Booking Fees</strong></li>
-                <li>✓ Free Recliner Seat Upgrades (subject to vacancy)</li>
-                <li>✓ <strong>Free Popcorn & Beverage Combo</strong> on first show</li>
-                <li>✓ Exclusive VIP Lounge & Valet Parking Privileges</li>
-                <li>✓ 24/7 Dedicated Concierge Support</li>
-            </ul>
-
-            <div style="margin-top: auto;">
-                {% if current_tier == 'Pro' %}
-                <button class="btn btn-primary" style="width: 100%;" disabled>Current Active Plan</button>
-                {% else %}
-                <form action="{{ url_for('customer.change_plan') }}" method="POST">
-                    <input type="hidden" name="tier" value="Pro">
-                    <button type="submit" class="btn btn-primary" style="width: 100%;">Upgrade to CinePro VIP</button>
-                </form>
-                {% endif %}
-            </div>
-        </div>
-
-    </div>
+    <section class="info-panel">
+        <h2>Your membership status</h2>
+        <p><strong>{{ current_tier }}</strong>{% if membership and membership.expires_at %} · Expires {{ membership.expires_at.strftime('%d %b %Y') }}{% else %} · No paid renewal is active{% endif %}</p>
+        <p class="muted">Benefits are calculated on the server, capped per configuration, and shown in the booking total before payment. Refunds reverse used benefits when the cancellation policy permits.</p>
+    </section>
 </div>
 {% endblock %}

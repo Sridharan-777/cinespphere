@@ -21,9 +21,9 @@ class CineSphereTestSuite(unittest.TestCase):
     def test_role_portals_and_cross_role_denial(self):
         role_pages = {
             "admin": ["/admin/dashboard", "/admin/theaters", "/admin/staff", "/admin/movies", "/admin/reviews", "/admin/users", "/admin/sessions", "/admin/audit-logs"],
-            "staff": ["/staff/dashboard", "/staff/customers", "/staff/workers", "/staff/shows", "/staff/tasks", "/staff/reports"],
-            "worker": ["/worker/dashboard", "/worker/tasks", "/worker/attendance", "/worker/profile"],
-            "customer": ["/customer/dashboard", "/customer/bookings", "/customer/favorites", "/customer/reviews", "/customer/profile", "/customer/notifications", "/customer/rewards", "/customer/plans"]
+            "staff": ["/staff/dashboard", "/staff/customers", "/staff/workers", "/staff/shows", "/staff/tasks", "/staff/reports", "/staff/rewards", "/staff/payroll", "/staff/support"],
+            "worker": ["/worker/dashboard", "/worker/tasks", "/worker/attendance", "/worker/profile", "/worker/rewards", "/worker/payroll"],
+            "customer": ["/customer/dashboard", "/customer/bookings", "/customer/favorites", "/customer/reviews", "/customer/profile", "/customer/notifications", "/customer/rewards", "/customer/plans", "/customer/support"]
         }
         for role, pages in role_pages.items():
             user = self.db.users.find_one({"role": role, "status": "active"})
@@ -94,31 +94,48 @@ class CineSphereTestSuite(unittest.TestCase):
             user_session["name"] = user.get("name", "Customer")
         page = self.client.get(f"/booking/{showtime['_id']}/seats")
         self.assertEqual(page.status_code, 200)
+        with self.client.session_transaction() as user_session:
+            csrf_token = user_session["_csrf_token"]
+        before = self.db.bookings.count_documents({"customer_id": user["_id"]})
         response = self.client.post(
             f"/booking/{showtime['_id']}/checkout",
-            data={"selected_seats": "A8", "payment_method": "Razorpay Online"},
+            data={"selected_seats": "A8", "payment_method": "Razorpay Online", "csrf_token": csrf_token},
             follow_redirects=False
         )
         self.assertEqual(response.status_code, 302)
+        self.assertEqual(self.db.bookings.count_documents({"customer_id": user["_id"]}), before)
 
     def test_prevent_double_booking(self):
         showtime = self.db.showtimes.find_one()
         customer = self.db.customers.find_one()
-        unique_seat = f"Z{str(uuid.uuid4())[:3]}"
+        valid_seats = [f"{row}{number}" for row in "ABCDEF" for number in range(1, 9)]
+        unique_seat = next(seat for seat in valid_seats if seat not in showtime.get("booked_seats", []))
+        key_one = f"test-pay-{uuid.uuid4()}"
+        key_two = f"test-pay-{uuid.uuid4()}"
 
-        # First booking
-        booking1, err1 = BookingService.create_booking(customer["user_id"], str(showtime["_id"]), [unique_seat])
-        self.assertIsNone(err1)
-        self.assertIsNotNone(booking1)
-        self.assertEqual(booking1["schema_version"], 2)
-        self.assertIn("venue", booking1["show_snapshot"])
-        self.assertIn("grand_total", booking1["pricing"])
-        self.assertGreater(len(booking1["pricing"]["seats"]), 0)
+        booking1 = None
+        try:
+            booking1, err1 = BookingService.create_booking(customer["user_id"], str(showtime["_id"]), [unique_seat],
+                payment_verification={"verified": True, "provider": "test", "idempotency_key": key_one})
+            self.assertIsNone(err1)
+            self.assertIsNotNone(booking1)
+            self.assertEqual(booking1["schema_version"], 3)
+            self.assertIn("venue", booking1["show_snapshot"])
+            self.assertIn("grand_total", booking1["pricing"])
+            self.assertGreater(len(booking1["pricing"]["seats"]), 0)
 
-        # Attempt to book exact same seat again
-        booking2, err2 = BookingService.create_booking(customer["user_id"], str(showtime["_id"]), [unique_seat])
-        self.assertIsNotNone(err2)
-        self.assertIn("already been booked", err2)
+            booking2, err2 = BookingService.create_booking(customer["user_id"], str(showtime["_id"]), [unique_seat],
+                payment_verification={"verified": True, "provider": "test", "idempotency_key": key_two})
+            self.assertIsNone(booking2)
+            self.assertIsNotNone(err2)
+            self.assertIn("just booked", err2)
+        finally:
+            if booking1:
+                self.db.showtimes.update_one({"_id": showtime["_id"]}, {"$pull": {"booked_seats": unique_seat}})
+                self.db.bookings.delete_one({"_id": booking1["_id"]})
+                self.db.payments.delete_many({"transaction_id": {"$in": [key_one, key_two]}})
+                self.db.customers.update_one({"user_id": customer["user_id"]}, {"$inc": {
+                    "total_bookings": -1, "total_spent": -booking1["pricing"]["grand_total"]}})
 
 if __name__ == "__main__":
     unittest.main()

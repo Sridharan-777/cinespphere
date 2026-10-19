@@ -45,7 +45,7 @@
         <div class="stat-card">
             <div class="stat-title">Total Spent</div>
             <div class="stat-value" style="color: var(--success);">₹{{ stats.total_spent }}</div>
-            <span style="font-size: 0.8rem; color: var(--text-muted);">Simulated Payments</span>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Confirmed cash bookings</span>
         </div>
         <div class="stat-card">
             <div class="stat-title">Loyalty Points</div>
@@ -61,7 +61,7 @@
             <span class="badge" style="background: var(--success); color: #000; font-weight: 700; margin-bottom: 0.5rem; display: inline-block;">CONFIRMED UPCOMING SHOW</span>
             <h3 style="font-size: 1.3rem; margin: 0.2rem 0;">{{ upcoming_booking.movie_title }}</h3>
             <p style="color: var(--text-muted); font-size: 0.88rem; margin: 0;">
-                🏛 {{ upcoming_booking.theater_name }} ({{ upcoming_booking.screen_name }}) • 📅 {{ upcoming_booking.show_date }} at {{ upcoming_booking.show_time }} • Seats: <strong style="color: #fff;">{{ upcoming_booking.seats|join(', ') }}</strong>
+                {{ upcoming_booking.theater_name }} ({{ upcoming_booking.screen_name }}) · {{ upcoming_booking.show_date }} at {{ upcoming_booking.start_time }} · Seats: <strong>{{ upcoming_booking.seats|join(', ') }}</strong>
             </p>
         </div>
         <div style="display: flex; gap: 0.8rem;">
@@ -89,7 +89,7 @@
                 <h3 class="movie-card-title">{{ movie.title }}</h3>
                 <p class="movie-card-info">{{ movie.genres|slice(2)|first|join(' • ') }} • {{ movie.language }}</p>
                 <div class="movie-card-actions">
-                    <a href="{{ url_for('movies.movie_details', movie_id=movie._id) }}" class="btn btn-sm btn-primary" style="flex: 1;">Book</a>
+                    <a href="{{ url_for('movies.movie_details', movie_id=movie._id) }}" class="btn btn-sm btn-primary" style="flex: 1;">View details</a>
                     <a href="{{ url_for('movies.movie_details', movie_id=movie._id) }}" class="btn btn-sm btn-outline">Details</a>
                 </div>
             </div>

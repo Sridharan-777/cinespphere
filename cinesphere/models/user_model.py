@@ -34,7 +34,7 @@ class UserModel:
         db = get_db()
         email = email.strip().lower()
         user = db.users.find_one({"email": email})
-        if not user or not check_password_hash(user["password_hash"], password):
+        if not user or not user.get("password_hash") or not check_password_hash(user["password_hash"], password):
             return None, "Invalid email or password."
         if user.get("status") != "active":
             return None, "Your account is deactivated. Please contact support."

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Reward governance — CineSphere{% endblock %}
+{% block content %}
+<div class="container"><header class="page-heading"><span class="eyebrow">System governance</span><h1>Worker reward policy</h1><p>Configuration, award history, and immutable credit outcomes.</p></header>
+<form method="POST" action="{{ url_for('admin.reward_policy_update') }}" class="form-card policy-grid">
+<label>Status<select name="status"><option value="draft" {% if policy.status == 'draft' %}selected{% endif %}>Draft</option><option value="active" {% if policy.status == 'active' %}selected{% endif %}>Active</option><option value="paused" {% if policy.status == 'paused' %}selected{% endif %}>Paused</option></select></label>
+<label>Cycle<select name="cycle"><option value="monthly">Monthly</option><option value="quarterly" {% if policy.cycle == 'quarterly' %}selected{% endif %}>Quarterly</option></select></label>
+<label>Credits per award<input type="number" name="credits_per_award" min="1" max="10" value="{{ policy.credits_per_award }}"></label>
+<label>Credit validity (days)<input type="number" name="credit_valid_days" min="1" max="365" value="{{ policy.credit_valid_days }}"></label>
+<label>Attendance threshold %<input type="number" name="attendance_threshold" min="0" max="100" step="0.1" value="{{ policy.attendance_threshold }}"></label>
+<label>Quality threshold %<input type="number" name="maintenance_quality_threshold" min="0" max="100" step="0.1" value="{{ policy.maintenance_quality_threshold }}"></label>
+<label>Minimum verified tasks<input type="number" name="minimum_verified_tasks" min="1" value="{{ policy.minimum_verified_tasks }}"></label>
+<label>Attendance weight<input type="number" name="attendance_weight" min="0" max="1" step="0.05" value="{{ policy.attendance_weight }}"></label>
+<label>Quality weight<input type="number" name="quality_weight" min="0" max="1" step="0.05" value="{{ policy.quality_weight }}"></label>
+<label class="span-2">Tie policy<input name="tie_policy" required value="{{ policy.tie_policy }}"></label>
+<label><input type="checkbox" name="eligible_seat_categories" value="Regular" checked> Regular seats</label>
+<label><input type="checkbox" name="restore_credit_on_permitted_cancellation" {% if policy.restore_credit_on_permitted_cancellation %}checked{% endif %}> Restore on permitted cancellation</label>
+<button class="btn btn-primary span-2" type="submit">Save policy</button></form>
+<section class="table-card"><h2>Award history</h2><div class="table-responsive"><table class="custom-table"><thead><tr><th>Worker</th><th>Cycle</th><th>Status</th><th>Reason</th><th>Issued</th></tr></thead><tbody>{% for award in awards %}<tr><td>{{ award.worker_name }}</td><td>{{ award.cycle }}</td><td>{{ award.status }}</td><td>{{ award.review_reason or '—' }}</td><td>{{ award.issued_at.strftime('%d %b %Y') if award.issued_at else '—' }}</td></tr>{% else %}<tr><td colspan="5">No awards.</td></tr>{% endfor %}</tbody></table></div></section>
+<section class="table-card"><h2>Credit ledger</h2><div class="table-responsive"><table class="custom-table"><thead><tr><th>Worker ID</th><th>Cycle</th><th>Status</th><th>Expires</th><th>Employer-funded value</th></tr></thead><tbody>{% for credit in credits %}<tr><td>{{ credit.worker_id }}</td><td>{{ credit.cycle }}</td><td>{{ credit.status }}</td><td>{{ credit.expires_at.strftime('%d %b %Y') }}</td><td>{{ credit.employer_funded_value or '—' }}</td></tr>{% else %}<tr><td colspan="5">No credits.</td></tr>{% endfor %}</tbody></table></div></section></div>
+{% endblock %}

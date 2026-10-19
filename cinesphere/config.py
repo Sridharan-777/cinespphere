@@ -17,8 +17,11 @@ class Config:
     # Payment Configurations
     RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "")
     RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "")
+    RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
     STRIPE_PUBLIC_KEY = os.getenv("STRIPE_PUBLIC_KEY", "")
     STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
+    RECENT_RELEASE_DAYS = int(os.getenv("RECENT_RELEASE_DAYS", "120"))
+    AI_PROVIDER_API_KEY = os.getenv("AI_PROVIDER_API_KEY", "")
     
     # Session security
     PERMANENT_SESSION_LIFETIME = timedelta(days=7)

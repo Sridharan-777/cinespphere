@@ -6,10 +6,12 @@
     <div class="form-card" style="padding:2rem; margin-bottom:2rem; text-align:center;">
         {% if not today_rec %}
         <h2>Today's shift is not marked</h2>
-        <p style="color:var(--text-muted);">Your theater staff must record your check-in.</p>
+        <p style="color:var(--text-muted);">Record your arrival for the assigned shift.</p>
+        <form method="POST"><button class="btn btn-success" name="action" value="check_in" type="submit">Check in</button></form>
         {% elif not today_rec.check_out %}
         <h2 style="color:var(--success);">Checked in at {{ today_rec.check_in }}</h2>
-        <p style="color:var(--text-muted);">Your staff supervisor will record check-out.</p>
+        <p style="color:var(--text-muted);">Check out when your assigned shift is complete.</p>
+        <form method="POST"><button class="btn btn-primary" name="action" value="check_out" type="submit">Check out</button></form>
         {% else %}
         <h2 style="color:var(--success);">Shift completed</h2>
         <p>Checked in: {{ today_rec.check_in }} | Checked out: {{ today_rec.check_out }}</p>

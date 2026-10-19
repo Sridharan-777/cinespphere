@@ -13,6 +13,9 @@ def seed_database():
     db = get_db()
     print("Beginning CineSphere enhanced database seeding (Multi-genre & South Indian movies)...")
 
+    if db.users.estimated_document_count() and os.getenv("CINESPHERE_ALLOW_DEVELOPMENT_RESET") != "YES":
+        raise RuntimeError("Refusing to reset a non-empty database. Set CINESPHERE_ALLOW_DEVELOPMENT_RESET=YES only for disposable development data.")
+
     # Clear previous collections
     db.users.drop()
     db.customers.drop()
@@ -294,21 +297,13 @@ def seed_database():
     print(f"Successfully populated {len(synced_movies)} rich movies into database!")
 
     if not synced_movies:
-        print("TMDB API failed. Using fallback mock movies...")
-        mock_movies = [
-            {"title": "The Galactic Journey", "language": "English", "genres": ["Sci-Fi", "Adventure"], "status": "Now Showing", "rating": 4.8, "created_at": datetime.now(UTC).replace(tzinfo=None), "poster_path": None, "overview": "A journey through the stars."},
-            {"title": "Mystery of the Old Manor", "language": "English", "genres": ["Mystery", "Thriller"], "status": "Now Showing", "rating": 4.5, "created_at": datetime.now(UTC).replace(tzinfo=None), "poster_path": None, "overview": "A gripping mystery."},
-            {"title": "Comedy Nights", "language": "English", "genres": ["Comedy"], "status": "Now Showing", "rating": 4.2, "created_at": datetime.now(UTC).replace(tzinfo=None), "poster_path": None, "overview": "Laugh out loud."},
-            {"title": "Action Hero", "language": "English", "genres": ["Action"], "status": "Now Showing", "rating": 4.6, "created_at": datetime.now(UTC).replace(tzinfo=None), "poster_path": None, "overview": "Explosions and fights."}
-        ]
-        for m in mock_movies:
-            m_res = db.movies.insert_one(m)
-            m["_id"] = m_res.inserted_id
-            synced_movies.append(m)
+        print("TMDB is unavailable or unconfigured. No movie metadata or local showtimes were invented.")
+        return
 
     # 5. CREATE COMPREHENSIVE SHOWTIMES
     print("Scheduling multi-city showtimes...")
-    show_dates = ["2026-10-07", "2026-10-08", "2026-10-09", "2026-10-10"]
+    start_date = datetime.now(UTC).replace(tzinfo=None).date()
+    show_dates = [(start_date + timedelta(days=offset)).isoformat() for offset in range(4)]
     show_times = [
         ("10:30 AM", "01:30 PM", 180),
         ("02:15 PM", "05:15 PM", 220),

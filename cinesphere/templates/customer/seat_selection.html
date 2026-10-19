@@ -15,10 +15,10 @@
                 <h1 style="font-size: 1.6rem; font-family: var(--font-heading); margin: 0;">{{ movie.title }}</h1>
                 <span class="chip" style="background: rgba(37,99,235,0.2); color: #93c5fd;">{{ movie.language }}</span>
                 {% if employee_benefits %}
-                <span class="badge" style="background:#15803d; color:white;">EMPLOYEE BENEFIT</span>
-                {% elif customer_tier == 'Pro' %}
+                <span class="badge" style="background:#15803d; color:white;">WORKER REWARD · {{ employee_benefits.available_credits }} AVAILABLE</span>
+                {% elif customer_tier == 'PRO' %}
                 <span class="badge" style="background: #e50914; color: white;">👑 PRO MEMBER: 20% OFF</span>
-                {% elif customer_tier == 'Plus' %}
+                {% elif customer_tier == 'PLUS' %}
                 <span class="badge" style="background: #3b82f6; color: white;">⭐ PLUS MEMBER: 10% OFF</span>
                 {% else %}
                 <span class="badge" style="background: #3f3f46; color: #d4d4d8;">FREE MEMBER</span>
@@ -82,7 +82,7 @@
 
         <div>
             <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.2rem;">
-                Estimated Amount {% if customer_tier != 'Free' %}<span style="color: #22c55e;">({{ customer_tier }} Discount Applied)</span>{% endif %}:
+                Estimated Amount {% if customer_tier != 'FREE' %}<span style="color: #158f70;">({{ customer_tier }} capped benefit)</span>{% endif %}:
             </div>
             <div id="estimated-total-display" style="font-size: 1.6rem; font-weight: 800; color: var(--accent);">₹0</div>
         </div>
@@ -93,18 +93,12 @@
             <input type="hidden" name="razorpay_order_id" id="razorpay-order-id">
             <input type="hidden" name="razorpay_payment_id" id="razorpay-payment-id">
             <input type="hidden" name="razorpay_signature" id="razorpay-signature">
-            {% if employee_benefits %}
-            <select name="benefit_type" id="benefit-type" class="form-control" style="width:auto;" onchange="updateSummary()">
-                <option value="free_pass">Free pass ({{ employee_benefits.free_remaining }} left)</option>
-                <option value="family_discount">Family 25% off ({{ employee_benefits.family_remaining }} left)</option>
-            </select>
-            {% endif %}
-            
+            {% if employee_benefits %}<select name="benefit_type" id="benefit-type" hidden><option value="free_pass">Approved reward credit</option></select>{% endif %}
             {% if session.get('user_id') %}
             <button type="submit" id="btn-pay" class="btn btn-primary" style="padding: 0.75rem 1.8rem; font-size: 1rem;" disabled>
-                {% if employee_benefits %}Apply employee benefit{% elif payment_configured %}Pay securely{% else %}Book now{% endif %}
+                {% if employee_benefits %}Redeem one admission credit{% elif payment_configured %}Pay securely{% else %}Payment unavailable{% endif %}
             </button>
-            {% if not payment_configured %}<span class="payment-status-note">Online payment is unavailable. Book now to confirm your seats directly.</span>{% endif %}
+            {% if not payment_configured and not employee_benefits %}<span class="payment-status-note">Online payment is not configured. No booking can be confirmed until a verified gateway is available.</span>{% endif %}
             {% else %}
             <a href="{{ url_for('auth.login', next=request.url) }}" class="btn btn-primary">
                 Sign In to Reserve Seats
@@ -117,6 +111,8 @@
 <script>
 const basePrice = {{ base_price }};
 const customerTier = "{{ customer_tier }}";
+const membershipDiscountPercent = {{ membership_plan.ticket_discount_percent or 0 }};
+const membershipDiscountCap = {{ membership_plan.ticket_discount_cap or 0 }};
 const razorpayKeyId = "{{ razorpay_key_id }}";
 const paymentConfigured = {{ 'true' if payment_configured else 'false' }};
 const showtimeId = "{{ showtime._id }}";
@@ -179,12 +175,8 @@ function updateSummary() {
         return;
     }
 
-    // Membership Tier Discount
-    let discountPct = 0;
-    if (customerTier === 'Pro') discountPct = 0.20;
-    else if (customerTier === 'Plus') discountPct = 0.10;
-
-    const discountAmount = Math.round(subtotal * discountPct);
+    // Membership values are configured and capped on the server.
+    const discountAmount = Math.min(Math.round(subtotal * membershipDiscountPercent / 100), membershipDiscountCap || Infinity);
     grandTotal = Math.max(1, grandTotal - discountAmount);
     
     totalDisplay.innerText = '₹' + grandTotal + (discountAmount > 0 ? ` (Saved ₹${discountAmount})` : '');
@@ -210,18 +202,8 @@ document.getElementById('checkout-form').addEventListener('submit', async functi
         return;
     }
     if (!paymentConfigured) {
-        payBtn.disabled = true;
-        payBtn.innerText = 'Confirming booking...';
-        try {
-            const bookingData = new FormData(this);
-            const response = await fetch("{{ url_for('booking.book_direct', showtime_id=showtime._id) }}", {method: 'POST', body: bookingData});
-            const result = await response.json();
-            if (!response.ok || !result.success) throw new Error(result.error || 'Booking failed.');
-            window.location.href = result.redirect_url;
-        } catch (err) {
-            alert(err.message || 'Booking could not be completed.');
-            resetPaymentButton();
-        }
+        alert('Online payment is not configured. No booking or charge was created.');
+        resetPaymentButton();
         return;
     }
     if (!window.Razorpay) {
@@ -270,8 +252,8 @@ document.getElementById('checkout-form').addEventListener('submit', async functi
 
 function resetPaymentButton() {
     const payBtn = document.getElementById('btn-pay');
-    payBtn.disabled = selectedSeats.length === 0;
-    payBtn.innerText = employeeBenefits ? 'Apply employee benefit' : (paymentConfigured ? 'Pay securely' : 'Book now');
+    payBtn.disabled = selectedSeats.length === 0 || (!employeeBenefits && !paymentConfigured);
+    payBtn.innerText = employeeBenefits ? 'Redeem one admission credit' : (paymentConfigured ? 'Pay securely' : 'Payment unavailable');
 }
 
 </script>

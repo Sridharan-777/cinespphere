@@ -1,0 +1,6 @@
+{% extends "base.html" %}{% block title %}Payroll drafts — CineSphere{% endblock %}{% block content %}
+<div class="container"><header class="page-heading"><span class="eyebrow">Calculation permission</span><h1>Payroll drafts</h1><p>Calculate theater-scoped drafts. Approval and payment recording are separate actions.</p></header>
+<div class="info-panel"><strong>{{ policy.pay_basis|title }} policy</strong><p>{{ policy.notes }}</p></div>
+<form method="POST" class="form-card inline-form"><label>Worker<select name="worker_id" required>{% for worker in workers %}<option value="{{ worker._id }}">{{ worker.name }}</option>{% endfor %}</select></label><label>Period<input name="period" type="month" required></label><button class="btn btn-primary">Calculate draft</button></form>
+<div class="table-card"><div class="table-responsive"><table class="custom-table"><thead><tr><th>Worker</th><th>Period</th><th>Base</th><th>Deductions</th><th>Net</th><th>Status</th></tr></thead><tbody>{% for record in records %}<tr><td>{{ record.worker_name }}</td><td>{{ record.period }}</td><td>₹{{ record.base_pay }}</td><td>₹{{ record.deductions }}</td><td>₹{{ record.net_pay }}</td><td>{{ record.status }}</td></tr>{% else %}<tr><td colspan="6">No payroll drafts.</td></tr>{% endfor %}</tbody></table></div></div></div>
+{% endblock %}

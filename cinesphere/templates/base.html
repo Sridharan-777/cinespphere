@@ -1,14 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}CineSphere — Movie Theater Management & Ticket Booking{% endblock %}</title>
-    <script>
-        if (localStorage.getItem('cinesphere_light_mode') === 'true') {
-            document.documentElement.classList.add('light-mode');
-        }
-    </script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     {% block extra_head %}{% endblock %}
 </head>
@@ -23,6 +19,13 @@
                 <span class="logo-text">Cine<span class="text-primary">Sphere</span></span>
             </a>
 
+            {% if not session.get('user_id') or session.get('role') == 'customer' %}
+            <form class="nav-search" action="{{ url_for('movies.search') }}" method="GET" role="search">
+                <label class="sr-only" for="global-search">Search movies</label>
+                <input id="global-search" name="q" value="{{ request.args.get('q', '') if request.endpoint == 'movies.search' else '' }}" placeholder="Search movies, languages and genres">
+            </form>
+            {% endif %}
+
             <nav class="nav-links">
                 {% if session.get('user_id') %}
                     {% if session.get('role') == 'customer' %}
@@ -33,6 +36,7 @@
                         <a href="{{ url_for('customer.live_shows') }}" class="nav-link {% if request.endpoint == 'customer.live_shows' %}active{% endif %}">Live Shows</a>
                         <a href="{{ url_for('customer.my_reviews') }}" class="nav-link {% if request.endpoint == 'customer.my_reviews' %}active{% endif %}">Reviews</a>
                         <a href="{{ url_for('customer.notifications') }}" class="nav-link {% if request.endpoint == 'customer.notifications' %}active{% endif %}">Alerts</a>
+                        <a href="{{ url_for('customer.support') }}" class="nav-link {% if request.endpoint == 'customer.support' %}active{% endif %}">Support</a>
                     {% elif session.get('role') == 'staff' %}
                         <a href="{{ url_for('staff.dashboard') }}" class="nav-link {% if request.endpoint == 'staff.dashboard' %}active{% endif %}">Dashboard</a>
                         <a href="{{ url_for('staff.customers_list') }}" class="nav-link {% if request.endpoint == 'staff.customers_list' %}active{% endif %}">Patrons</a>
@@ -41,10 +45,16 @@
                         <a href="{{ url_for('staff.movies') }}" class="nav-link {% if request.endpoint == 'staff.movies' %}active{% endif %}">Movies</a>
                         <a href="{{ url_for('staff.tasks') }}" class="nav-link {% if request.endpoint == 'staff.tasks' %}active{% endif %}">Tasks</a>
                         <a href="{{ url_for('staff.reports') }}" class="nav-link {% if request.endpoint == 'staff.reports' %}active{% endif %}">Reports</a>
+                        <a href="{{ url_for('staff.reward_reviews') }}" class="nav-link {% if request.endpoint and 'reward' in request.endpoint %}active{% endif %}">Rewards</a>
+                        <a href="{{ url_for('staff.payroll') }}" class="nav-link {% if request.endpoint == 'staff.payroll' %}active{% endif %}">Payroll</a>
+                        <a href="{{ url_for('staff.support') }}" class="nav-link {% if request.endpoint == 'staff.support' %}active{% endif %}">Support</a>
                     {% elif session.get('role') == 'worker' %}
                         <a href="{{ url_for('worker.dashboard') }}" class="nav-link {% if request.endpoint == 'worker.dashboard' %}active{% endif %}">Dashboard</a>
                         <a href="{{ url_for('worker.tasks_list') }}" class="nav-link {% if request.endpoint == 'worker.tasks_list' %}active{% endif %}">Tasks</a>
                         <a href="{{ url_for('worker.attendance') }}" class="nav-link {% if request.endpoint == 'worker.attendance' %}active{% endif %}">Attendance</a>
+                        <a href="{{ url_for('worker.rewards') }}" class="nav-link {% if request.endpoint == 'worker.rewards' %}active{% endif %}">Rewards</a>
+                        <a href="{{ url_for('worker.admission') }}" class="nav-link {% if request.endpoint == 'worker.admission' %}active{% endif %}">Admission</a>
+                        <a href="{{ url_for('worker.payroll') }}" class="nav-link {% if request.endpoint == 'worker.payroll' %}active{% endif %}">Payslips</a>
                         <a href="{{ url_for('worker.profile') }}" class="nav-link {% if request.endpoint == 'worker.profile' %}active{% endif %}">Profile</a>
                     {% elif session.get('role') == 'admin' %}
                         <a href="{{ url_for('admin.dashboard') }}" class="nav-link {% if request.endpoint == 'admin.dashboard' %}active{% endif %}">Dashboard</a>
@@ -54,6 +64,8 @@
                         <a href="{{ url_for('admin.users_list') }}" class="nav-link {% if request.endpoint and 'user' in request.endpoint %}active{% endif %}">Users</a>
                         <a href="{{ url_for('admin.operations') }}" class="nav-link {% if request.endpoint and 'operations' in request.endpoint %}active{% endif %}">Operations</a>
                         <a href="{{ url_for('admin.audit_logs') }}" class="nav-link {% if request.endpoint == 'admin.audit_logs' %}active{% endif %}">Audit</a>
+                        <a href="{{ url_for('admin.rewards_management') }}" class="nav-link {% if request.endpoint and 'reward' in request.endpoint %}active{% endif %}">Rewards</a>
+                        <a href="{{ url_for('admin.payroll_management') }}" class="nav-link {% if request.endpoint and 'payroll' in request.endpoint %}active{% endif %}">Payroll</a>
                     {% endif %}
                 {% else %}
                     <a href="{{ url_for('public.index') }}" class="nav-link {% if request.endpoint == 'public.index' %}active{% endif %}">Home</a>
@@ -63,15 +75,16 @@
             </nav>
 
             <div class="nav-actions">
-                <button type="button" onclick="toggleLightMode()" id="theme-toggle-btn" class="nav-theme-toggle" aria-label="Switch to light theme">Light</button>
+                {% if nav_locations and (not session.get('user_id') or session.get('role') == 'customer') %}
+                <form class="nav-location" action="{{ url_for('public.index') }}" method="GET">
+                    <label class="sr-only" for="nav-city">Location</label><select id="nav-city" name="location" onchange="this.form.submit()"><option value="">All locations</option>{% for city in nav_locations %}<option value="{{ city }}" {% if request.args.get('location') == city %}selected{% endif %}>{{ city }}</option>{% endfor %}</select>
+                </form>
+                {% endif %}
                 {% if session.get('user_id') %}
-                <details class="account-menu">
-                    <summary>{{ session.get('name', 'Account').split()[0] }}</summary>
-                    <div class="account-menu-panel">
-                        <span class="role-tag role-{{ session.get('role') }}">{{ session.get('role')|upper }}</span>
-                        <a href="{{ url_for('auth.logout') }}">Logout</a>
-                    </div>
-                </details>
+                <span class="account-name">{{ session.get('name', 'Account').split()[0] }} · {{ session.get('role')|upper }}</span>
+                <form action="{{ url_for('auth.logout') }}" method="POST" class="account-logout-form">
+                    <button type="submit" class="btn btn-outline nav-logout">Logout</button>
+                </form>
                 {% else %}
                 <a href="{{ url_for('auth.login') }}" class="btn btn-outline nav-login">Login</a>
                 <a href="{{ url_for('auth.register') }}" class="btn btn-primary nav-register">Register</a>
@@ -148,26 +161,38 @@
         </div>
     </footer>
 
+    <details class="assistant-launcher">
+        <summary aria-label="Open CineSphere assistant">CS</summary>
+        <div class="assistant-panel"><div class="assistant-title"><span>CineSphere assistant</span><small>{% if ai_assistant_configured %}Configured{% else %}Unavailable{% endif %}</small></div>
+        {% if ai_assistant_configured %}<p>The secure assistant endpoint is not enabled in this build. Use the shortcuts below.</p>{% else %}<p>The model provider is not configured. No answer will be invented.</p>{% endif %}
+        <div class="assistant-links"><a href="{{ url_for('movies.movie_list') }}">Find movies</a>{% if session.get('role') == 'customer' %}<a href="{{ url_for('customer.my_bookings') }}">My bookings</a><a href="{{ url_for('customer.support') }}">Contact support</a>{% elif session.get('role') == 'worker' %}<a href="{{ url_for('worker.tasks_list') }}">My tasks</a><a href="{{ url_for('worker.rewards') }}">Reward evidence</a>{% endif %}</div></div>
+    </details>
+
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     <script>
-        function setThemeButton(isLight) {
-            const button = document.getElementById('theme-toggle-btn');
-            if (!button) return;
-            button.textContent = isLight ? 'Dark' : 'Light';
-            button.setAttribute('aria-label', isLight ? 'Switch to dark theme' : 'Switch to light theme');
-        }
-
-        function toggleLightMode() {
-            const isLight = !document.documentElement.classList.contains('light-mode');
-            document.documentElement.classList.toggle('light-mode', isLight);
-            document.body.classList.toggle('light-mode', isLight);
-            localStorage.setItem('cinesphere_light_mode', String(isLight));
-            setThemeButton(isLight);
-        }
-
-        const savedLightMode = localStorage.getItem('cinesphere_light_mode') === 'true';
-        document.body.classList.toggle('light-mode', savedLightMode);
-        setThemeButton(savedLightMode);
+        // Make every same-origin mutation carry the session CSRF token, including
+        // legacy forms and JSON fetch calls.
+        (function () {
+            const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
+            document.querySelectorAll('form[method="POST"], form[method="post"]').forEach((form) => {
+                if (!form.querySelector('input[name="csrf_token"]')) {
+                    const input = document.createElement('input');
+                    input.type = 'hidden'; input.name = 'csrf_token'; input.value = token;
+                    form.appendChild(input);
+                }
+            });
+            const nativeFetch = window.fetch;
+            window.fetch = function (resource, options) {
+                const url = typeof resource === 'string' ? resource : resource.url;
+                if (url && new URL(url, window.location.href).origin === window.location.origin) {
+                    options = options || {};
+                    const headers = new Headers(options.headers || {});
+                    headers.set('X-CSRF-Token', token);
+                    options.headers = headers;
+                }
+                return nativeFetch(resource, options);
+            };
+        }());
     </script>
     {% block scripts %}{% endblock %}
 </body>

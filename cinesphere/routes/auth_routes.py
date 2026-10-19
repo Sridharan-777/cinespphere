@@ -1,13 +1,26 @@
 ﻿from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from bson import ObjectId
 from flask import current_app
+from datetime import UTC, datetime, timedelta
 from cinesphere.models.user_model import UserModel
 from cinesphere.models.database import get_db
 from cinesphere.models.worker_model import find_worker
 from cinesphere.utils.audit import log_audit
 from cinesphere.services.user_session_service import start_user_session, close_user_session
 from cinesphere.oauth import oauth
+from cinesphere.utils.security import is_safe_redirect_target
 auth_bp = Blueprint("auth", __name__)
+
+
+def _login_throttle_key(email):
+    return {"email": email.lower(), "ip": request.remote_addr or "unknown"}
+
+
+def _login_is_throttled(db, email):
+    cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(minutes=15)
+    return db.login_attempts.count_documents({
+        **_login_throttle_key(email), "succeeded": False, "created_at": {"$gte": cutoff}
+    }) >= 5
 
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
@@ -26,8 +39,15 @@ def login():
         email = request.form.get("email", "").strip()
         password = request.form.get("password", "").strip()
 
+        db = get_db()
+        if _login_is_throttled(db, email):
+            flash("Too many failed attempts. Wait 15 minutes or use account recovery.", "danger")
+            return render_template("auth/login.html", email=email), 429
+
         user, err = UserModel.authenticate(email, password)
         if err:
+            db.login_attempts.insert_one({**_login_throttle_key(email), "succeeded": False,
+                                          "created_at": datetime.now(UTC).replace(tzinfo=None)})
             flash(err, "danger")
             return render_template("auth/login.html", email=email)
 
@@ -39,7 +59,7 @@ def login():
         session["role"] = user["role"]
 
         # Fetch theater_id if staff or worker
-        db = get_db()
+        db.login_attempts.delete_many(_login_throttle_key(email))
         if user["role"] == "staff":
             staff_doc = db.staff.find_one({"user_id": user["_id"]})
             if staff_doc:
@@ -51,7 +71,6 @@ def login():
                 session["theater_id"] = str(worker_doc["theater_id"])
                 session["theater_name"] = worker_doc.get("theater_name", "")
 
-        from datetime import UTC, datetime
         db.users.update_one({"_id": user["_id"]}, {"$set": {"last_login": datetime.now(UTC).replace(tzinfo=None)}})
         start_user_session(user, "password")
 
@@ -59,7 +78,7 @@ def login():
         flash(f"Welcome back, {user['name']}!", "success")
 
         next_url = request.args.get("next")
-        if next_url and next_url.startswith("/"):
+        if is_safe_redirect_target(next_url):
             return redirect(next_url)
 
         if user["role"] == "admin":
@@ -82,13 +101,22 @@ def google_login():
 
 @auth_bp.route("/login/google/callback")
 def google_callback():
-    token = oauth.google.authorize_access_token()
-    user_info = oauth.google.parse_id_token(token, None)
+    try:
+        token = oauth.google.authorize_access_token()
+        user_info = oauth.google.parse_id_token(token, None)
+    except Exception:
+        current_app.logger.exception("Google OAuth callback failed")
+        flash("Google sign-in could not be verified. No account changes were made.", "danger")
+        return redirect(url_for("auth.login"))
     
-    email = user_info.get("email")
+    email = (user_info.get("email") or "").strip().lower()
     name = user_info.get("name")
     google_id = user_info.get("sub")
     
+    if not email or not google_id or user_info.get("email_verified") is not True:
+        flash("Google did not provide a verified email address.", "danger")
+        return redirect(url_for("auth.login"))
+
     db = get_db()
     user = db.users.find_one({"email": email})
     
@@ -111,8 +139,17 @@ def google_callback():
             "total_spent": 0,
             "status": "active"
         })
+    elif user.get("role") != "customer":
+        flash("Google sign-in is available for customer accounts only.", "danger")
+        return redirect(url_for("auth.login"))
+    elif user.get("google_id") and user.get("google_id") != google_id:
+        flash("This email is linked to a different Google identity.", "danger")
+        return redirect(url_for("auth.login"))
+    elif not user.get("google_id") and user.get("password_hash"):
+        # Email equality alone is not sufficient proof to link an existing local account.
+        flash("Sign in with your password before linking Google to this existing account.", "warning")
+        return redirect(url_for("auth.login"))
     elif not user.get("google_id"):
-        # Link existing account to Google
         db.users.update_one({"_id": user["_id"]}, {"$set": {"google_id": google_id}})
         
     if user.get("status") != "active":
@@ -126,7 +163,6 @@ def google_callback():
     session["email"] = user["email"]
     session["role"] = user["role"]
     
-    from datetime import UTC, datetime
     db.users.update_one({"_id": user["_id"]}, {"$set": {"last_login": datetime.now(UTC).replace(tzinfo=None)}})
     start_user_session(user, "google")
     
@@ -155,8 +191,8 @@ def register():
             flash("Passwords do not match.", "danger")
             return render_template("auth/register.html", name=name, email=email, phone=phone)
 
-        if len(password) < 6:
-            flash("Password must be at least 6 characters long.", "warning")
+        if len(password) < 10:
+            flash("Password must be at least 10 characters long.", "warning")
             return render_template("auth/register.html", name=name, email=email, phone=phone)
 
         user, err = UserModel.create_user(name, email, password, role="customer", phone=phone)
@@ -183,7 +219,7 @@ def register():
 
     return render_template("auth/register.html")
 
-@auth_bp.route("/logout")
+@auth_bp.route("/logout", methods=["POST"])
 def logout():
     uid = session.get("user_id")
     if uid:

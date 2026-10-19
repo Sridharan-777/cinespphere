@@ -1,6 +1,6 @@
 import requests
 import os
-from flask import current_app
+import re
 
 LANGUAGE_NAMES = {
     'te': 'Telugu',
@@ -22,6 +22,8 @@ class TMDBService:
         self.image_base_url = 'https://image.tmdb.org/t/p'
 
     def _get(self, endpoint, params=None):
+        if not self.api_key:
+            return None
         if not params:
             params = {}
         params['api_key'] = self.api_key
@@ -30,8 +32,7 @@ class TMDBService:
             if resp.status_code == 200:
                 return resp.json()
             return None
-        except Exception as e:
-            print(f'TMDB API request error for {endpoint}: {e}')
+        except requests.RequestException:
             return None
 
     def get_popular_movies(self, page=1):
@@ -90,8 +91,10 @@ class TMDBService:
         # Extract trailer
         videos = tmdb_raw.get('videos', {}).get('results', [])
         trailer_url = None
+        videos.sort(key=lambda item: (not bool(item.get('official')), item.get('type') != 'Trailer'))
         for v in videos:
-            if v.get('site') == 'YouTube' and v.get('type') in ('Trailer', 'Teaser'):
+            key = str(v.get('key') or '')
+            if v.get('site') == 'YouTube' and v.get('type') in ('Trailer', 'Teaser') and re.fullmatch(r'[A-Za-z0-9_-]{6,20}', key):
                 trailer_url = f"https://www.youtube.com/embed/{v.get('key')}"
                 break
 
@@ -100,7 +103,7 @@ class TMDBService:
         
         genres = [g.get('name') for g in tmdb_raw.get('genres', [])] if isinstance(tmdb_raw.get('genres'), list) else []
 
-        raw_lang = tmdb_raw.get('original_language', 'en').lower()
+        raw_lang = str(tmdb_raw.get('original_language') or '').lower()
         full_lang_name = LANGUAGE_NAMES.get(raw_lang, raw_lang.upper())
 
         is_south_indian = raw_lang in ['te', 'ta', 'ml', 'kn']
@@ -113,19 +116,21 @@ class TMDBService:
             'poster_url': f"{self.image_base_url}/w500{poster_path}" if poster_path else '/static/images/default_poster.svg',
             'backdrop_url': f"{self.image_base_url}/original{backdrop_path}" if backdrop_path else '/static/images/default_backdrop.svg',
             'release_date': tmdb_raw.get('release_date'),
-            'runtime': tmdb_raw.get('runtime', 135) or 135,
+            'runtime': tmdb_raw.get('runtime'),
             'genres': genres,
             'language_code': raw_lang,
             'language': full_lang_name,
             'is_south_indian': is_south_indian,
-            'rating': round(float(tmdb_raw.get('vote_average', 7.5)), 1),
+            'rating': round(float(tmdb_raw['vote_average']), 1) if tmdb_raw.get('vote_average') is not None else None,
             'vote_count': tmdb_raw.get('vote_count', 0),
             'popularity': tmdb_raw.get('popularity', 0.0),
             'cast': cast_list,
             'director': director,
             'writers': writers,
             'trailer_url': trailer_url,
-            'status': 'Now Showing'
+            'release_status': tmdb_raw.get('status'),
+            'status': 'Catalog',
+            'metadata_source': 'TMDB'
         }
 
 tmdb_service = TMDBService()

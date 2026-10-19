@@ -43,7 +43,7 @@
                         <div style="display: flex; gap: 0.5rem;">
                             <a href="{{ url_for('booking.ticket', booking_code=b.booking_code) }}" target="_blank" class="btn btn-sm btn-outline">Ticket</a>
                             {% if b.status == 'Confirmed' %}
-                            <form action="{{ url_for('customer.cancel_booking', booking_code=b.booking_code) }}" method="POST" onsubmit="return confirm('Cancel this booking and get a simulated refund?')">
+                            <form action="{{ url_for('customer.cancel_booking', booking_code=b.booking_code) }}" method="POST" onsubmit="return confirm('Cancel this booking? Eligible cash payments will be marked Refund Pending for provider processing.')">
                                 <button type="submit" class="btn btn-sm btn-danger">Cancel</button>
                             </form>
                             {% endif %}

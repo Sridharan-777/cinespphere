@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Admission validation — CineSphere{% endblock %}
+{% block content %}
+<div class="container narrow-page">
+    <header class="page-heading"><span class="eyebrow">Assigned duty</span><h1>Ticket admission</h1>
+        <p>Validate a signed ticket token or use the authorized manual booking lookup.</p></header>
+    {% if not authorized %}
+    <div class="state-card state-error"><h2>Permission denied</h2><p>Your current duties do not include admission or ticket validation. Ask a theater supervisor to assign the duty.</p></div>
+    {% else %}
+    <form method="POST" class="form-card stack-form">
+        <label for="token">Signed ticket token</label><textarea id="token" name="token" rows="4" placeholder="Scan or paste the token"></textarea>
+        <span class="field-divider">or</span>
+        <label for="booking-code">Booking reference</label><input id="booking-code" name="booking_code" placeholder="CS-2026-ABC123">
+        <button class="btn btn-primary" type="submit">Validate admission</button>
+    </form>
+    {% if result %}<div class="state-card {% if result.ok %}state-success{% else %}state-error{% endif %}"><p>{{ result.message }}</p></div>{% endif %}
+    {% endif %}
+</div>
+{% endblock %}
