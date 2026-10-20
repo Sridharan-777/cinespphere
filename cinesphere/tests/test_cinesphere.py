@@ -66,6 +66,20 @@ class CineSphereTestSuite(unittest.TestCase):
         self.assertEqual(self.client.get("/staff/dashboard").status_code, 403)
         self.assertEqual(self.client.get("/worker/dashboard").status_code, 403)
 
+    def test_staff_excel_report_download(self):
+        staff_user = self.db.users.find_one({"role": "staff", "status": "active"})
+        self.assertIsNotNone(staff_user)
+        with self.client.session_transaction() as user_session:
+            user_session.clear()
+            user_session["user_id"] = str(staff_user["_id"])
+            user_session["role"] = "staff"
+            user_session["name"] = staff_user.get("name", "Staff")
+        response = self.client.get("/staff/reports/excel")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.mimetype, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        self.assertTrue(response.data.startswith(b"PK"))
+        self.assertIn(".xlsx", response.headers.get("Content-Disposition", ""))
+
     def test_theaters_capacity_rule(self):
         theaters = list(self.db.theaters.find())
         for t in theaters:

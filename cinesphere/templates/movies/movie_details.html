@@ -66,16 +66,17 @@
 
     <section class="movie-trailer-card" aria-labelledby="movie-trailer-title">
         <div class="section-header">
-            <div><span class="eyebrow">Official video</span><h2 id="movie-trailer-title" class="section-title">Watch the trailer</h2></div>
-            {% if not trailer_url %}<a class="btn btn-outline" href="{{ trailer_search_url }}" target="_blank" rel="noopener noreferrer">Find official trailer</a>{% endif %}
+            <div><span class="eyebrow">Trailer & videos</span><h2 id="movie-trailer-title" class="section-title">Watch the trailer: {{ movie.title }}</h2></div>
+            {% if not trailer_url %}<a class="btn btn-primary" href="{{ trailer_search_url }}" target="_blank" rel="noopener noreferrer">Watch official videos on YouTube</a>{% endif %}
         </div>
         {% if trailer_url %}
         <div class="movie-trailer-frame">
             <iframe src="{{ trailer_url }}" title="{{ movie.title }} official trailer" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
         </div>
         {% else %}
+        <div class="trailer-pending"><strong>Studio embed pending</strong><p>Open verified YouTube results now, or staff can paste the official URL in Movie management.</p></div><div hidden>
         <div class="empty-state">An embeddable official trailer has not been supplied yet. Use “Find official trailer” or add its YouTube URL from the movie-management page.</div>
-        {% endif %}
+        </div>{% endif %}
     </section>
 
     <!-- Available Theater Showtimes -->

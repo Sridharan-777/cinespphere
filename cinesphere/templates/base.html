@@ -81,7 +81,7 @@
                 </form>
                 {% endif %}
                 {% if session.get('user_id') %}
-                <span class="account-name">{{ session.get('name', 'Account').split()[0] }} · {{ session.get('role')|upper }}</span>
+                <span class="account-name" title="{{ session.get('role')|title }} account">{{ session.get('name', 'Account').split()[0] }}</span>
                 <form action="{{ url_for('auth.logout') }}" method="POST" class="account-logout-form">
                     <button type="submit" class="btn btn-outline nav-logout">Logout</button>
                 </form>

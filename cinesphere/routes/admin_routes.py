@@ -549,7 +549,11 @@ def reward_policy_update():
 @role_required("admin")
 def payroll_management():
     records = list(get_db().payroll.find().sort([("period", -1), ("created_at", -1)]).limit(250))
-    return render_template("admin/payroll.html", records=records, policy=PayrollService.policy())
+    summary = {"total": len(records), "draft": sum(1 for r in records if r.get("status") == "Draft"),
+               "review": sum(1 for r in records if r.get("status") == "Needs Review"),
+               "approved": sum(1 for r in records if r.get("status") == "Approved"),
+               "payable": sum(float(r.get("net_pay", 0) or 0) for r in records if r.get("status") in {"Draft", "Approved"})}
+    return render_template("admin/payroll.html", records=records, summary=summary, policy=PayrollService.policy())
 
 
 @admin_bp.route("/admin/payroll/<record_id>/approve", methods=["POST"])

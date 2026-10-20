@@ -1,93 +1,22 @@
 {% extends "base.html" %}
-
-{% block title %}Field Workers — Staff Portal{% endblock %}
-
+{% block title %}Field workers — Staff{% endblock %}
 {% block content %}
-<div class="container">
-    <div class="section-header">
-        <div>
-            <h1 class="section-title">Field Worker Management</h1>
-            <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.3rem;">
-                Theater Capacity Policy: <strong>Exactly 20 Field Workers maximum</strong> per location.
-            </p>
-        </div>
-        <div>
-            {% if worker_count < max_workers %}
-            <a href="{{ url_for('staff.worker_create') }}" class="btn btn-primary">+ Add Worker ({{ worker_count }}/{{ max_workers }})</a>
-            {% else %}
-            <span class="badge" style="background: rgba(239, 68, 68, 0.2); color: #b4233c; font-size: 0.9rem; padding: 0.5rem 1rem;">
-                Max Capacity Reached (20/20)
-            </span>
-            {% endif %}
-        </div>
-    </div>
-
-    <!-- Capacity Bar Card -->
-    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 1.2rem; margin-bottom: 2rem;">
-        <div style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 0.5rem;">
-            <span>Field Worker Roster Limit</span>
-            <strong>{{ worker_count }} / 20 Assigned</strong>
-        </div>
-        <progress class="capacity-progress {% if worker_count == 20 %}capacity-progress-full{% else %}capacity-progress-accent{% endif %}" value="{{ worker_count }}" max="20">{{ worker_count }} / 20</progress>
-    </div>
-
-    <div class="table-responsive">
-        <table class="custom-table">
-            <thead>
-                <tr>
-                    <th>Emp Code</th>
-                    <th>Worker Name</th>
-                    <th>Department</th>
-                    <th>Designation</th>
-                    <th>Contact</th>
-                    <th>Current Task</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for w in workers %}
-                <tr>
-                    <td><code>{{ w.employee_code }}</code></td>
-                    <td><strong>{{ w.name }}</strong></td>
-                    <td>{{ w.department }}</td>
-                    <td>{{ w.designation }}</td>
-                    <td>{{ w.phone or w.email }}</td>
-                    <td><span style="color: #60a5fa;">{{ w.current_task or 'Idle' }}</span></td>
-                    <td>
-                        <span class="badge {% if w.status == 'active' %}badge-success{% else %}badge-danger{% endif %}">
-                            {{ w.status|upper }}
-                        </span>
-                    </td>
-                    <td>
-                        <form action="{{ url_for('staff.worker_attendance', worker_id=w._id) }}" method="POST" style="display:inline;">
-                            <button name="action" value="check_in" class="btn btn-sm btn-success">Check In</button>
-                            <button name="action" value="check_out" class="btn btn-sm btn-outline">Check Out</button>
-                        </form>
-                        <form action="{{ url_for('staff.worker_toggle_status', worker_id=w._id) }}" method="POST">
-                            <button type="submit" class="btn btn-sm {% if w.status == 'active' %}btn-danger{% else %}btn-success{% endif %}">
-                                {% if w.status == 'active' %}Deactivate{% else %}Activate{% endif %}
-                            </button>
-                        </form>
-                        <details><summary>Edit</summary>
-                            <form action="{{ url_for('staff.worker_edit', worker_id=w._id) }}" method="POST" class="crud-form-grid">
-                                <input class="form-control" name="name" value="{{ w.name }}" required>
-                                <input class="form-control" name="department" value="{{ w.department }}" required>
-                                <input class="form-control" name="designation" value="{{ w.designation }}" required>
-                                <input class="form-control" name="shift_timings" value="{{ w.shift_timings }}" required>
-                                <button class="btn btn-sm btn-primary">Save</button>
-                            </form>
-                        </details>
-                        <form action="{{ url_for('staff.worker_delete', worker_id=w._id) }}" method="POST" onsubmit="return confirm('Deactivate access and retain all operational records?');">
-                            <button class="btn btn-sm btn-danger">Retire access</button>
-                        </form>
-                    </td>
-                </tr>
-                {% else %}
-                <tr><td colspan="8" style="text-align: center; color: var(--text-muted);">No field workers assigned to this theater yet.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+<div class="container management-page">
+  <header class="page-heading action-heading"><div><span class="eyebrow">People operations</span><h1>Field worker roster</h1><p>{{ theater_name }} · {{ worker_count }} of {{ max_workers }} active worker positions</p></div>{% if worker_count < max_workers %}<a href="{{ url_for('staff.worker_create') }}" class="btn btn-primary">+ Add worker</a>{% endif %}</header>
+  <div class="capacity-card"><div><strong>Roster capacity</strong><span>{{ worker_count }} / {{ max_workers }}</span></div><progress value="{{ worker_count }}" max="{{ max_workers }}"></progress></div>
+  <div class="worker-roster-grid">
+    {% for w in workers %}
+    <article class="worker-roster-card">
+      <div class="worker-identity"><span class="worker-avatar">{{ w.name[:1]|upper }}</span><div><h2>{{ w.name }}</h2><p>{{ w.employee_code }} · {{ w.department }}</p></div><span class="status-pill status-{{ w.status }}">{{ w.status|title }}</span></div>
+      <dl class="worker-facts"><div><dt>Role</dt><dd>{{ w.designation }}</dd></div><div><dt>Shift</dt><dd>{{ w.shift_timings }}</dd></div><div><dt>Contact</dt><dd>{{ w.phone or w.email }}</dd></div><div><dt>Current task</dt><dd>{{ w.current_task or 'Idle / on standby' }}</dd></div></dl>
+      <div class="attendance-strip"><div><span>Today's attendance</span><strong>{% if not w.today_attendance %}Not checked in{% elif w.today_attendance.check_out %}Shift completed{% else %}Checked in at {{ w.today_attendance.check_in }}{% endif %}</strong></div>
+        {% if w.status == 'active' %}<form action="{{ url_for('staff.worker_attendance', worker_id=w._id) }}" method="POST">{% if not w.today_attendance %}<button name="action" value="check_in" class="btn btn-success btn-sm">Check in</button>{% elif not w.today_attendance.check_out %}<button name="action" value="check_out" class="btn btn-outline btn-sm">Check out</button>{% endif %}</form>{% endif %}
+      </div>
+      <div class="record-actions"><details class="edit-drawer"><summary>Edit details</summary><form action="{{ url_for('staff.worker_edit', worker_id=w._id) }}" method="POST" class="stack-form compact-form"><label>Name<input name="name" value="{{ w.name }}" required></label><label>Department<input name="department" value="{{ w.department }}" required></label><label>Designation<input name="designation" value="{{ w.designation }}" required></label><label>Shift<input name="shift_timings" value="{{ w.shift_timings }}" required></label><button class="btn btn-primary btn-sm">Save worker</button></form></details>
+        <form action="{{ url_for('staff.worker_toggle_status', worker_id=w._id) }}" method="POST"><button class="btn btn-sm {% if w.status == 'active' %}btn-danger{% else %}btn-success{% endif %}">{% if w.status == 'active' %}Deactivate access{% else %}Reactivate{% endif %}</button></form>
+      </div>
+    </article>
+    {% else %}<div class="empty-state">No field workers assigned yet.</div>{% endfor %}
+  </div>
 </div>
 {% endblock %}

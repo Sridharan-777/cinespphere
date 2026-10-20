@@ -1,6 +1,8 @@
 ﻿from flask import Blueprint, render_template, request, redirect, url_for, flash, session, abort
 from datetime import UTC, datetime
 from bson import ObjectId
+from datetime import timedelta
+from flask import send_file
 from werkzeug.security import generate_password_hash
 from cinesphere.models.database import get_db
 from cinesphere.models.worker_model import count_workers, find_worker, list_workers, update_worker
@@ -10,6 +12,7 @@ from cinesphere.utils.audit import log_audit
 from cinesphere.services.reward_service import RewardService
 from cinesphere.services.payroll_service import PayrollService
 from cinesphere.utils.media import youtube_embed_url
+from cinesphere.utils.xlsx_report import build_xlsx
 from cinesphere.services.availability_service import list_available_showtimes
 
 import os
@@ -152,6 +155,12 @@ def workers_list():
     theater_id = staff["theater_id"]
 
     workers = list_workers(theater_id)
+    today = datetime.now(UTC).replace(tzinfo=None).strftime("%Y-%m-%d")
+    attendance = {str(row["worker_id"]): row for row in db.attendance.find({
+        "theater_id": theater_id, "date": today
+    })}
+    for worker in workers:
+        worker["today_attendance"] = attendance.get(str(worker["_id"]))
     worker_count = sum(1 for worker in workers if worker.get("status") == "active")
     return render_template("staff/workers.html", workers=workers, theater_name=staff["theater_name"],
                            worker_count=worker_count, max_workers=20)
@@ -398,7 +407,63 @@ def reports():
     stats = ReportService.get_theater_stats(theater_id)
     bookings = list(db.bookings.find({"theater_id": theater_id}).sort("created_at", -1))
 
-    return render_template("staff/reports.html", stats=stats, bookings=bookings, theater=theater)
+    return render_template("staff/reports.html", stats=stats, bookings=bookings, theater=theater,
+                           **_report_chart_data(bookings))
+
+
+def _report_chart_data(bookings):
+    today = datetime.now(UTC).replace(tzinfo=None).date()
+    days = [today - timedelta(days=offset) for offset in range(6, -1, -1)]
+    daily = {day.isoformat(): {"label": day.strftime("%a"), "revenue": 0, "bookings": 0} for day in days}
+    movies, statuses = {}, {}
+    for booking in bookings:
+        raw_date = booking.get("show_date") or booking.get("created_at")
+        key = raw_date.date().isoformat() if isinstance(raw_date, datetime) else str(raw_date or "")[:10]
+        amount = float(booking.get("pricing", {}).get("grand_total", 0) or 0)
+        if key in daily and booking.get("status") != "Cancelled":
+            daily[key]["bookings"] += 1
+            daily[key]["revenue"] += amount
+        if booking.get("status") != "Cancelled":
+            title = booking.get("movie_title", "Unknown movie")
+            movies[title] = movies.get(title, 0) + amount
+        status = booking.get("status", "Unknown")
+        statuses[status] = statuses.get(status, 0) + 1
+    daily_series = list(daily.values())
+    top_movies = sorted(movies.items(), key=lambda item: item[1], reverse=True)[:6]
+    return {"daily_series": daily_series, "top_movies": top_movies, "status_counts": statuses,
+            "max_daily": max([item["revenue"] for item in daily_series] + [1]),
+            "max_movie": max([amount for _, amount in top_movies] + [1])}
+
+
+@staff_bp.route("/staff/reports/excel")
+@role_required("staff")
+def reports_excel():
+    db = get_db()
+    staff = _staff_profile()
+    if not staff:
+        abort(403)
+    theater = db.theaters.find_one({"_id": staff["theater_id"]}) or {}
+    bookings = list(db.bookings.find({"theater_id": staff["theater_id"]}).sort("created_at", -1))
+    stats = ReportService.get_theater_stats(staff["theater_id"])
+    chart = _report_chart_data(bookings)
+    summary = [["CineSphere theater report", "Value"], ["Theater", theater.get("name", "")],
+               ["Generated", datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")],
+               ["Total revenue (INR)", stats.get("total_revenue", 0)],
+               ["Total bookings", stats.get("total_bookings", 0)],
+               ["Average ticket value (INR)", stats.get("avg_ticket_value", 0)],
+               ["Occupancy (%)", stats.get("occupancy_rate", 0)],
+               ["Active screens", stats.get("screens_count", 0)], ["Field workers", stats.get("worker_count", 0)]]
+    daily = [["Day", "Bookings", "Revenue (INR)"]] + [[row["label"], row["bookings"], row["revenue"]] for row in chart["daily_series"]]
+    details = [["Booking code", "Movie", "Screen", "Show date", "Seats", "Amount (INR)", "Method", "Status"]]
+    for booking in bookings:
+        details.append([booking.get("booking_code", ""), booking.get("movie_title", ""), booking.get("screen_name", ""),
+                        booking.get("show_date", ""), ", ".join(booking.get("seats", [])),
+                        booking.get("pricing", {}).get("grand_total", 0), booking.get("payment_method", ""), booking.get("status", "")])
+    workbook = build_xlsx([("Summary", summary, [32, 24]), ("Daily performance", daily, [18, 16, 20]),
+                           ("Bookings", details, [20, 28, 20, 16, 18, 18, 20, 18])])
+    safe_name = "".join(ch if ch.isalnum() else "-" for ch in theater.get("name", "theater")).strip("-").lower()
+    return send_file(workbook, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                     as_attachment=True, download_name=f"cinesphere-{safe_name}-report.xlsx")
 
 
 @staff_bp.route("/staff/rewards")
@@ -478,6 +543,16 @@ def payroll():
     staff = _staff_profile()
     if not staff:
         abort(403)
+    if request.method == "POST" and request.form.get("action") == "calculate_all":
+        period = request.form.get("period", "")
+        created = issues = 0
+        for worker in list_workers(staff["theater_id"], active_only=True):
+            _, error = PayrollService.calculate_draft(worker["_id"], period, staff["user_id"])
+            created += 0 if error else 1
+            issues += 1 if error else 0
+        flash(f"Payroll run finished: {created} drafts created, {issues} records need attention.",
+              "success" if created else "warning")
+        return redirect(url_for("staff.payroll"))
     if request.method == "POST":
         worker = find_worker(request.form.get("worker_id"), staff["theater_id"], active_only=True)
         if not worker:
@@ -486,7 +561,11 @@ def payroll():
         flash(error or "Payroll draft calculated. It still requires independent approval.", "danger" if error else "success")
         return redirect(url_for("staff.payroll"))
     records = list(db.payroll.find({"theater_id": staff["theater_id"]}).sort("period", -1))
-    return render_template("staff/payroll.html", records=records,
+    totals = {"gross": sum(float(r.get("base_pay", 0) or 0) for r in records),
+              "net": sum(float(r.get("net_pay", 0) or 0) for r in records),
+              "drafts": sum(1 for r in records if r.get("status") in {"Draft", "Needs Review"}),
+              "paid": sum(1 for r in records if str(r.get("status", "")).startswith("Paid"))}
+    return render_template("staff/payroll.html", records=records, totals=totals,
                            workers=list_workers(staff["theater_id"], active_only=True), policy=PayrollService.policy())
 
 
@@ -663,6 +742,54 @@ def movies():
                            staff_user_id=ObjectId(session["user_id"]))
 
 
+@staff_bp.route("/staff/movies/<movie_id>/edit", methods=["POST"])
+@role_required("staff")
+def movie_edit(movie_id):
+    db = get_db()
+    staff_user_id = ObjectId(session["user_id"])
+    try:
+        movie_oid = ObjectId(movie_id)
+    except Exception:
+        abort(404)
+    movie = db.movies.find_one({"_id": movie_oid})
+    if not movie:
+        abort(404)
+    title = request.form.get("title", "").strip()
+    if not title:
+        flash("Movie title is required.", "danger")
+        return redirect(url_for("staff.movies"))
+    supplied_trailer = request.form.get("trailer_url", "").strip()
+    trailer_url = youtube_embed_url(supplied_trailer)
+    if supplied_trailer and not trailer_url:
+        flash("Use a valid YouTube trailer URL or video ID.", "danger")
+        return redirect(url_for("staff.movies"))
+    poster_url = movie.get("poster_url")
+    poster = request.files.get("poster")
+    if poster and poster.filename:
+        ext = os.path.splitext(secure_filename(poster.filename))[1].lower()
+        if ext not in {".jpg", ".jpeg", ".png", ".webp"}:
+            flash("Poster must be JPG, PNG, or WebP.", "danger")
+            return redirect(url_for("staff.movies"))
+        upload_dir = os.path.join(current_app.static_folder, "uploads", "posters")
+        os.makedirs(upload_dir, exist_ok=True)
+        filename = f"{uuid4().hex}{ext}"
+        poster.save(os.path.join(upload_dir, filename))
+        poster_url = url_for("static", filename=f"uploads/posters/{filename}")
+    status = request.form.get("status", "Catalog")
+    db.movies.update_one({"_id": movie_oid}, {"$set": {
+        "title": title, "language": request.form.get("language", "English").strip(),
+        "genres": [x.strip() for x in request.form.get("genres", "").split(",") if x.strip()],
+        "director": request.form.get("director", "").strip(), "runtime": request.form.get("runtime", type=int) or 0,
+        "release_date": request.form.get("release_date", ""), "overview": request.form.get("overview", "").strip(),
+        "status": status if status in {"Catalog", "Now Showing", "Coming Soon", "Archived"} else "Catalog",
+        "poster_url": poster_url, "trailer_url": trailer_url,
+        "updated_at": datetime.now(UTC).replace(tzinfo=None),
+    }})
+    log_audit("STAFF_UPDATE_MOVIE", "movie", movie_oid, f"Staff updated {title}")
+    flash("Movie, poster, and trailer details updated.", "success")
+    return redirect(url_for("staff.movies"))
+
+
 @staff_bp.route("/staff/movies/<movie_id>/delete", methods=["POST"])
 @role_required("staff")
 def movie_delete(movie_id):
@@ -677,7 +804,6 @@ def movie_delete(movie_id):
         abort(404)
     if movie.get("created_by_staff") != staff_user_id:
         abort(403)
-
     dependencies = {
         "showtimes": db.showtimes.count_documents({"movie_id": movie_oid}),
         "bookings": db.bookings.count_documents({"movie_id": movie_oid}),

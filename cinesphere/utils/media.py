@@ -4,6 +4,12 @@ from urllib.parse import parse_qs, urlparse
 
 YOUTUBE_KEY_PATTERN = re.compile(r"^[A-Za-z0-9_-]{6,20}$")
 
+VERIFIED_TRAILER_FALLBACKS = {
+    "spider-man: brand new day": "https://www.youtube.com/embed/sU_ltjrFrQE",
+    "the odyssey": "https://www.youtube.com/embed/f_bKjZeJBBI",
+    "avengers: endgame": "https://www.youtube.com/embed/TcMBFSGVi1c",
+}
+
 
 def youtube_embed_url(value):
     """Normalize common YouTube links to an embeddable HTTPS URL."""
@@ -26,3 +32,8 @@ def youtube_embed_url(value):
         elif parsed.path.startswith(("/embed/", "/shorts/")):
             key = parsed.path.strip("/").split("/")[1]
     return f"https://www.youtube.com/embed/{key}" if key and YOUTUBE_KEY_PATTERN.fullmatch(key) else None
+
+
+def verified_trailer_for(title):
+    """Return a verified studio embed for known legacy seed records."""
+    return VERIFIED_TRAILER_FALLBACKS.get(str(title or "").strip().lower())

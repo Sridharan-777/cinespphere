@@ -1,55 +1,49 @@
 {% extends "base.html" %}
-{% block title %}Movie Catalog - Staff{% endblock %}
+{% block title %}Movie management — Staff{% endblock %}
 {% block content %}
-<div class="container">
-    <div class="section-header">
-        <div>
-            <h1 class="section-title">Movie catalog</h1>
-            <p>Add an accurate catalog entry and upload its official poster. A movie becomes locally bookable only after a showtime is scheduled.</p>
-        </div>
-    </div>
+<div class="container management-page">
+  <header class="page-heading action-heading">
+    <div><span class="eyebrow">Catalog control</span><h1>Movies, posters & trailers</h1><p>Add movies and manage every entry created by your staff account.</p></div>
+    <a class="btn btn-outline" href="#add-movie" onclick="document.getElementById('add-movie').open=true">+ Add a movie</a>
+  </header>
 
-    <div class="form-card" style="padding:1.5rem;margin-bottom:2rem;">
-        <h2>Add movie and poster</h2>
-        <form action="{{ url_for('staff.movies') }}" method="POST" enctype="multipart/form-data" class="crud-form-grid">
-            <input class="form-control" name="title" placeholder="Movie title" required>
-            <input class="form-control" name="language" value="English" required>
-            <input class="form-control" name="genres" placeholder="Genres, comma separated">
-            <input class="form-control" name="director" placeholder="Director">
-            <input class="form-control" type="number" name="runtime" min="0" placeholder="Runtime in minutes">
-            <input class="form-control" type="date" name="release_date">
-            <select class="form-control" name="status">
-                <option>Catalog</option>
-                <option>Now Showing</option>
-                <option>Coming Soon</option>
-            </select>
-            <input class="form-control" name="trailer_url" placeholder="YouTube trailer URL or video ID">
-            <label class="file-field">Official poster (JPG, PNG or WebP)
-                <input class="form-control" type="file" name="poster" accept="image/jpeg,image/png,image/webp" required>
-            </label>
-            <textarea class="form-control" name="overview" placeholder="Overview" style="grid-column:1/-1;"></textarea>
-            <button class="btn btn-primary" type="submit">Add movie</button>
-        </form>
-    </div>
+  <details id="add-movie" class="management-panel">
+    <summary><strong>Add movie</strong><span>Poster and YouTube trailer supported</span></summary>
+    <form action="{{ url_for('staff.movies') }}" method="POST" enctype="multipart/form-data" class="crud-form-grid panel-form">
+      <label>Movie title<input name="title" required></label><label>Language<input name="language" value="English" required></label>
+      <label>Genres<input name="genres" placeholder="Action, Drama"></label><label>Director<input name="director"></label>
+      <label>Runtime (minutes)<input type="number" name="runtime" min="0"></label><label>Release date<input type="date" name="release_date"></label>
+      <label>Status<select name="status"><option>Catalog</option><option>Now Showing</option><option>Coming Soon</option></select></label>
+      <label>YouTube trailer<input name="trailer_url" placeholder="youtube.com/watch?v=..."></label>
+      <label class="file-field">Official poster<input type="file" name="poster" accept="image/jpeg,image/png,image/webp" required></label>
+      <label class="span-2">Overview<textarea name="overview" rows="4"></textarea></label>
+      <button class="btn btn-primary" type="submit">Add movie</button>
+    </form>
+  </details>
 
-    <div class="dashboard-grid">
-        {% for m in movies %}
-        <article class="stat-card movie-admin-card">
-            <img src="{{ m.poster_url }}" alt="{{ m.title }} poster" loading="lazy">
-            <h3>{{ m.title }}</h3>
-            <p>{{ m.language or 'Language unavailable' }} · {{ m.status }}</p>
-            {% if m.created_by_staff == staff_user_id %}
-            <form action="{{ url_for('staff.movie_delete', movie_id=m._id) }}" method="POST"
-                  onsubmit="return confirm('Delete this movie? Records with operational history will be archived instead.');">
-                <button class="btn btn-sm btn-danger" type="submit">Delete movie</button>
-            </form>
-            {% else %}
-            <span class="muted">Managed by administrator or another staff member</span>
-            {% endif %}
-        </article>
-        {% else %}
-        <div class="empty-state">No movies in the catalog.</div>
-        {% endfor %}
-    </div>
+  <div class="catalog-management-grid">
+    {% for m in movies %}
+    <article class="catalog-management-card">
+      <img src="{{ m.poster_url or url_for('static', filename='images/default_poster.svg') }}" alt="{{ m.title }} poster" loading="lazy">
+      <div class="catalog-card-content">
+        <div><span class="status-pill">{{ m.status }}</span><h2>{{ m.title }}</h2><p>{{ m.language or 'Language not set' }} · {{ m.genres|join(', ') }}</p></div>
+        <p class="trailer-state {% if m.trailer_url %}ready{% endif %}">{% if m.trailer_url %}Trailer ready{% else %}Trailer still required{% endif %}</p>
+        <details class="edit-drawer"><summary>Edit movie</summary>
+          <form action="{{ url_for('staff.movie_edit', movie_id=m._id) }}" method="POST" enctype="multipart/form-data" class="stack-form compact-form">
+            <label>Title<input name="title" value="{{ m.title }}" required></label><label>Language<input name="language" value="{{ m.language }}"></label>
+            <label>Genres<input name="genres" value="{{ m.genres|join(', ') }}"></label><label>Director<input name="director" value="{{ m.director or '' }}"></label>
+            <label>Runtime<input type="number" name="runtime" value="{{ m.runtime or 0 }}"></label><label>Release date<input type="date" name="release_date" value="{{ m.release_date or '' }}"></label>
+            <label>Status<select name="status">{% for status in ['Catalog','Now Showing','Coming Soon','Archived'] %}<option {% if m.status == status %}selected{% endif %}>{{ status }}</option>{% endfor %}</select></label>
+            <label>Trailer URL<input name="trailer_url" value="{{ m.trailer_url or '' }}"></label><label>Replace poster<input type="file" name="poster" accept="image/jpeg,image/png,image/webp"></label>
+            <label>Overview<textarea name="overview" rows="3">{{ m.overview or '' }}</textarea></label><button class="btn btn-primary">Save changes</button>
+          </form>
+        </details>
+        {% if m.created_by_staff == staff_user_id %}
+        <form action="{{ url_for('staff.movie_delete', movie_id=m._id) }}" method="POST" onsubmit="return confirm('Remove this movie? Existing history will be archived safely.');"><button class="btn btn-danger btn-sm">Delete / archive</button></form>
+        {% else %}<p class="ownership-note">You can edit poster, trailer and metadata. Administrator approval is required to remove this global title.</p>{% endif %}
+      </div>
+    </article>
+    {% else %}<div class="empty-state">No movies in the catalog.</div>{% endfor %}
+  </div>
 </div>
 {% endblock %}

@@ -4,7 +4,7 @@ from urllib.parse import quote_plus
 from cinesphere.models.database import get_db
 from cinesphere.services.tmdb_service import tmdb_service
 from cinesphere.services.availability_service import list_available_showtimes
-from cinesphere.utils.media import youtube_embed_url
+from cinesphere.utils.media import youtube_embed_url, verified_trailer_for
 
 movie_bp = Blueprint("movies", __name__)
 
@@ -77,7 +77,9 @@ def movie_details(movie_id):
 
     showtimes = list_available_showtimes(db, {"movie_id": movie["_id"]})
 
-    trailer_url = youtube_embed_url(movie.get("trailer_url"))
+    trailer_url = youtube_embed_url(movie.get("trailer_url")) or verified_trailer_for(movie.get("title"))
+    if trailer_url and not movie.get("trailer_url"):
+        db.movies.update_one({"_id": movie["_id"]}, {"$set": {"trailer_url": trailer_url}})
     if not trailer_url and movie.get("tmdb_id") and tmdb_service.is_configured:
         details = tmdb_service.get_movie_details(movie["tmdb_id"])
         refreshed = tmdb_service.format_movie_data(details) if details else None
