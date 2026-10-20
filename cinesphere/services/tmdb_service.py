@@ -21,6 +21,10 @@ class TMDBService:
         self.base_url = 'https://api.themoviedb.org/3'
         self.image_base_url = 'https://image.tmdb.org/t/p'
 
+    @property
+    def is_configured(self):
+        return bool(self.api_key)
+
     def _get(self, endpoint, params=None):
         if not self.api_key:
             return None
@@ -39,12 +43,12 @@ class TMDBService:
         data = self._get('movie/popular', {'page': page})
         return data.get('results', []) if data else []
 
-    def get_now_playing_movies(self, page=1):
-        data = self._get('movie/now_playing', {'page': page})
+    def get_now_playing_movies(self, page=1, region='IN'):
+        data = self._get('movie/now_playing', {'page': page, 'region': region})
         return data.get('results', []) if data else []
 
-    def get_upcoming_movies(self, page=1):
-        data = self._get('movie/upcoming', {'page': page})
+    def get_upcoming_movies(self, page=1, region='IN'):
+        data = self._get('movie/upcoming', {'page': page, 'region': region})
         return data.get('results', []) if data else []
 
     def get_top_rated_movies(self, page=1):
@@ -62,7 +66,21 @@ class TMDBService:
         return self._get(f'person/{actor_id}', {'append_to_response': 'movie_credits'})
 
     def search_movies(self, query, page=1):
-        data = self._get('search/movie', {'query': query, 'page': page})
+        data = self._get('search/movie', {'query': query, 'page': page, 'region': 'IN', 'include_adult': 'false'})
+        return data.get('results', []) if data else []
+
+    def discover_indian_movies(self, start_date, end_date, page=1, newest_first=True):
+        """Discover recent Indian-language releases without implying local availability."""
+        data = self._get('discover/movie', {
+            'page': page,
+            'region': 'IN',
+            'with_original_language': 'ta|te|ml|kn|hi',
+            'primary_release_date.gte': start_date,
+            'primary_release_date.lte': end_date,
+            'sort_by': 'primary_release_date.desc' if newest_first else 'primary_release_date.asc',
+            'include_adult': 'false',
+            'include_video': 'false',
+        })
         return data.get('results', []) if data else []
 
     def get_genres(self):

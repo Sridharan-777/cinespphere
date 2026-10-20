@@ -7,6 +7,7 @@ from cinesphere.utils.decorators import role_required, login_required
 from cinesphere.utils.audit import log_audit, create_notification
 from cinesphere.services.membership_service import MembershipService
 from cinesphere.services.reward_service import RewardService
+from cinesphere.services.availability_service import list_available_showtimes
 
 customer_bp = Blueprint("customer", __name__)
 
@@ -14,13 +15,7 @@ customer_bp = Blueprint("customer", __name__)
 @role_required("customer")
 def live_shows():
     db = get_db()
-    today = datetime.now(UTC).replace(tzinfo=None).strftime("%Y-%m-%d")
-    shows = list(db.showtimes.find({"status": "active", "show_date": {"$gte": today}}).sort([("show_date", 1), ("start_time", 1)]))
-    for show in shows:
-        show["movie"] = db.movies.find_one({"_id": show["movie_id"]})
-        show["theater"] = db.theaters.find_one({"_id": show["theater_id"]})
-        screen = db.screens.find_one({"_id": show["screen_id"]})
-        show["available_seats"] = max(0, (screen or {}).get("capacity", 48) - len(show.get("booked_seats", [])))
+    shows = list_available_showtimes(db)
     return render_template("customer/live_shows.html", shows=shows)
 
 @customer_bp.route("/customer/plans")
@@ -28,6 +23,7 @@ def live_shows():
 def plans():
     db = get_db()
     uid = ObjectId(session["user_id"])
+    user = db.users.find_one({"_id": uid}) or {}
     customer = db.customers.find_one({"user_id": uid}) or {
         "user_id": uid, "name": user.get("name", ""), "phone": user.get("phone", ""),
         "address": "", "city": "", "notification_preferences": {}
@@ -77,7 +73,9 @@ def dashboard():
     
     # Recommendations: Based on genres customer has watched or top rated movies
     booked_movie_ids = [b["movie_id"] for b in bookings]
-    recommended_movies = list(db.movies.find({"_id": {"$nin": booked_movie_ids}}).sort("rating", -1).limit(4))
+    recommended_movies = list(db.movies.find({
+        "_id": {"$nin": booked_movie_ids}, "status": {"$ne": "Archived"}
+    }).sort("rating", -1).limit(4))
     
     # Favorites
     fav_ids = customer.get("favorite_movies", []) if customer else []
@@ -198,7 +196,14 @@ def favorites():
 def toggle_favorite(movie_id):
     db = get_db()
     uid = ObjectId(session["user_id"])
-    m_id = ObjectId(movie_id)
+    try:
+        m_id = ObjectId(movie_id)
+    except Exception:
+        flash("Invalid movie identifier.", "danger")
+        return redirect(url_for("movies.movie_list"))
+    if not db.movies.find_one({"_id": m_id, "status": {"$ne": "Archived"}}):
+        flash("That movie is no longer available.", "warning")
+        return redirect(url_for("movies.movie_list"))
     cust = db.customers.find_one({"user_id": uid})
     
     fav_ids = cust.get("favorite_movies", []) if cust else []

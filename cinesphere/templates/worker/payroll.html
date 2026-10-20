@@ -1,5 +1,85 @@
-{% extends "base.html" %}{% block title %}My payslips — CineSphere{% endblock %}{% block content %}
-<div class="container"><header class="page-heading"><span class="eyebrow">Private salary information</span><h1>My payslips</h1><p>Only your own approved payroll records are shown.</p></header>
-<div class="table-card"><div class="table-responsive"><table class="custom-table"><thead><tr><th>Period</th><th>Base</th><th>Allowances</th><th>Overtime</th><th>Deductions</th><th>Net</th><th>Status</th></tr></thead><tbody>{% for record in records %}<tr><td>{{ record.period }}</td><td>₹{{ record.base_pay }}</td><td>₹{{ record.allowances }}</td><td>₹{{ record.overtime }}</td><td>₹{{ record.deductions }}</td><td>₹{{ record.net_pay }}</td><td>{{ record.status }}</td></tr>{% else %}<tr><td colspan="7">No payslips yet.</td></tr>{% endfor %}</tbody></table></div></div>
-{% if records %}<form method="POST" class="form-card inline-form"><label>Payslip<select name="payroll_id">{% for record in records %}<option value="{{ record._id }}">{{ record.period }}</option>{% endfor %}</select></label><label>Discrepancy<textarea name="message" required></textarea></label><button class="btn btn-primary">Request review</button></form>{% endif %}</div>
+{% extends "base.html" %}
+{% block title %}My salary and payslips — CineSphere{% endblock %}
+{% block content %}
+<div class="container worker-self-page">
+    <header class="page-heading worker-page-heading">
+        <div>
+            <span class="eyebrow">Private salary information</span>
+            <h1>My salary and payslips</h1>
+            <p>Your contracted pay and only your own approved payroll records.</p>
+        </div>
+        <a class="btn btn-outline" href="{{ url_for('worker.dashboard') }}">Back to dashboard</a>
+    </header>
+
+    <section class="worker-summary-grid" aria-label="Salary summary">
+        <article class="worker-summary-card accent-green">
+            <span>Monthly salary</span>
+            <strong>₹{{ '%.2f'|format((worker.monthly_salary or 0)|float) }}</strong>
+            <small>contracted base pay</small>
+        </article>
+        <article class="worker-summary-card accent-blue">
+            <span>Hourly reference</span>
+            <strong>₹{{ '%.2f'|format((worker.hourly_rate or 0)|float) }}</strong>
+            <small>per hour</small>
+        </article>
+        <article class="worker-summary-card accent-purple">
+            <span>Latest approved net</span>
+            <strong>{% if latest_record %}₹{{ '%.2f'|format(latest_record.net_pay|float) }}{% else %}—{% endif %}</strong>
+            <small>{{ latest_record.period if latest_record else 'No approved payslip yet' }}</small>
+        </article>
+        <article class="worker-summary-card accent-coral">
+            <span>Latest status</span>
+            <strong class="worker-status-value">{{ latest_record.status if latest_record else 'Pending' }}</strong>
+            <small>{% if latest_record and latest_record.payment_date %}Payment date {{ latest_record.payment_date }}{% else %}check again after approval{% endif %}</small>
+        </article>
+    </section>
+
+    <div class="state-card">
+        <strong>How salary is calculated</strong>
+        <p>{{ policy.notes }} CineSphere records payroll status but does not transfer money.</p>
+    </div>
+
+    <section class="table-card">
+        <div class="section-header"><div><h2>Approved payslips</h2><p>Draft calculations remain with payroll staff until they are approved.</p></div></div>
+        <div class="table-responsive"><table class="custom-table">
+            <thead><tr><th>Period</th><th>Base</th><th>Allowances</th><th>Overtime</th><th>Deductions</th><th>Net pay</th><th>Status</th></tr></thead>
+            <tbody>
+            {% for record in records %}
+            <tr>
+                <td>{{ record.period }}</td>
+                <td>₹{{ '%.2f'|format((record.base_pay or 0)|float) }}</td>
+                <td>₹{{ '%.2f'|format((record.allowances or 0)|float) }}</td>
+                <td>₹{{ '%.2f'|format((record.overtime or 0)|float) }}</td>
+                <td>₹{{ '%.2f'|format((record.deductions or 0)|float) }}</td>
+                <td><strong>₹{{ '%.2f'|format((record.net_pay or 0)|float) }}</strong></td>
+                <td><span class="status-pill {% if record.status == 'Paid (recorded)' %}status-success{% endif %}">{{ record.status }}</span></td>
+            </tr>
+            {% else %}<tr><td colspan="7" class="empty-cell">No approved payslips are available yet. Your contracted salary is shown above.</td></tr>{% endfor %}
+            </tbody>
+        </table></div>
+    </section>
+
+    {% if records %}
+    <section class="form-card worker-payroll-review">
+        <div><h2>Request a payslip review</h2><p>Describe a possible discrepancy. Payroll staff will receive the request.</p></div>
+        <form method="POST" class="stack-form worker-review-form">
+            <label for="payroll-id">Payslip</label>
+            <select id="payroll-id" name="payroll_id" required>{% for record in records %}<option value="{{ record._id }}">{{ record.period }} — ₹{{ '%.2f'|format(record.net_pay|float) }}</option>{% endfor %}</select>
+            <label for="payroll-message">What should be reviewed?</label>
+            <textarea id="payroll-message" name="message" rows="4" maxlength="1000" required></textarea>
+            <button class="btn btn-primary" type="submit">Send review request</button>
+        </form>
+    </section>
+    {% endif %}
+
+    {% if disputes %}
+    <section class="table-card">
+        <div class="section-header"><div><h2>My review requests</h2><p>Status of discrepancies you reported.</p></div></div>
+        <div class="table-responsive"><table class="custom-table">
+            <thead><tr><th>Submitted</th><th>Message</th><th>Status</th></tr></thead>
+            <tbody>{% for dispute in disputes %}<tr><td>{{ dispute.created_at.strftime('%d %b %Y') if dispute.created_at else '—' }}</td><td>{{ dispute.message }}</td><td><span class="status-pill">{{ dispute.status }}</span></td></tr>{% endfor %}</tbody>
+        </table></div>
+    </section>
+    {% endif %}
+</div>
 {% endblock %}

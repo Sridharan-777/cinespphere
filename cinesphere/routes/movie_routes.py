@@ -1,7 +1,10 @@
 from flask import Blueprint, render_template, request
 from bson import ObjectId
+from urllib.parse import quote_plus
 from cinesphere.models.database import get_db
 from cinesphere.services.tmdb_service import tmdb_service
+from cinesphere.services.availability_service import list_available_showtimes
+from cinesphere.utils.media import youtube_embed_url
 
 movie_bp = Blueprint("movies", __name__)
 
@@ -14,8 +17,8 @@ def movie_list():
     region_filter = request.args.get("region", "all") # south or global
     sort_by = request.args.get("sort", "popularity")
 
-    query = {}
-    if status_filter != "all":
+    query = {"status": {"$ne": "Archived"}}
+    if status_filter in {"Catalog", "Coming Soon", "Now Showing"}:
         query["status"] = status_filter
     if genre_filter != "all":
         query["genres"] = genre_filter
@@ -42,12 +45,13 @@ def movie_list():
     movies = list(db.movies.find(query).sort(sort_order))
 
     # All distinct genres & languages for quick pills
-    all_genres = sorted([g for g in db.movies.distinct("genres") if g])
-    all_languages = sorted([l for l in db.movies.distinct("language") if l])
+    visible_query = {"status": {"$ne": "Archived"}}
+    all_genres = sorted([g for g in db.movies.distinct("genres", visible_query) if g])
+    all_languages = sorted([l for l in db.movies.distinct("language", visible_query) if l])
     
     # Pre-counted South Indian vs All
-    south_indian_count = db.movies.count_documents({"is_south_indian": True})
-    total_count = db.movies.count_documents({})
+    south_indian_count = db.movies.count_documents({**visible_query, "is_south_indian": True})
+    total_count = db.movies.count_documents(visible_query)
 
     return render_template("movies/movies.html",
                            movies=movies,
@@ -71,20 +75,16 @@ def movie_details(movie_id):
     if not movie:
         return render_template("errors/404.html", message="Movie not found"), 404
 
-    # Fetch available shows for this movie
-    showtimes = list(db.showtimes.find({"movie_id": movie["_id"], "status": "active"}).sort("show_date", 1))
-    
-    # Enrich with theater & screen info
-    for show in showtimes:
-        theater = db.theaters.find_one({"_id": show["theater_id"]})
-        screen = db.screens.find_one({"_id": show["screen_id"]})
-        show["theater_name"] = theater["name"] if theater else "CineSphere"
-        show["theater_city"] = theater["city"] if theater else "Mumbai"
-        show["screen_name"] = screen["name"] if screen else "Screen 1"
-        show["screen_type"] = screen["screen_type"] if screen else "Standard"
-        booked = len(show.get("booked_seats", []))
-        total_capacity = screen.get("capacity", 48) if screen else 48
-        show["available_seats_count"] = max(0, total_capacity - booked)
+    showtimes = list_available_showtimes(db, {"movie_id": movie["_id"]})
+
+    trailer_url = youtube_embed_url(movie.get("trailer_url"))
+    if not trailer_url and movie.get("tmdb_id") and tmdb_service.is_configured:
+        details = tmdb_service.get_movie_details(movie["tmdb_id"])
+        refreshed = tmdb_service.format_movie_data(details) if details else None
+        trailer_url = youtube_embed_url((refreshed or {}).get("trailer_url"))
+        if trailer_url:
+            db.movies.update_one({"_id": movie["_id"]}, {"$set": {"trailer_url": trailer_url}})
+            movie["trailer_url"] = trailer_url
 
     # Reviews & Ratings
     reviews = list(db.reviews.find({"movie_id": movie["_id"], "status": "Published"}).sort("created_at", -1))
@@ -106,6 +106,8 @@ def movie_details(movie_id):
                            movie=movie,
                            showtimes=showtimes,
                            reviews=reviews,
+                           trailer_url=trailer_url,
+                           trailer_search_url=f"https://www.youtube.com/results?search_query={quote_plus(movie.get('title', '') + ' official trailer')}",
                            rating_bars=rating_bars,
                            total_reviews=total_reviews)
 
@@ -146,6 +148,7 @@ def search():
     if query:
         # Regex search across title, language, cast name, genres, director
         movies = list(db.movies.find({
+            "status": {"$ne": "Archived"},
             "$or": [
                 {"title": {"$regex": query, "$options": "i"}},
                 {"original_title": {"$regex": query, "$options": "i"}},

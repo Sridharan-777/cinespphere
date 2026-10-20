@@ -15,7 +15,7 @@
             {% if worker_count < max_workers %}
             <a href="{{ url_for('staff.worker_create') }}" class="btn btn-primary">+ Add Worker ({{ worker_count }}/{{ max_workers }})</a>
             {% else %}
-            <span class="badge" style="background: rgba(239, 68, 68, 0.2); color: #fca5a5; font-size: 0.9rem; padding: 0.5rem 1rem;">
+            <span class="badge" style="background: rgba(239, 68, 68, 0.2); color: #b4233c; font-size: 0.9rem; padding: 0.5rem 1rem;">
                 Max Capacity Reached (20/20)
             </span>
             {% endif %}

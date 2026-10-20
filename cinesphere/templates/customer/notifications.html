@@ -13,10 +13,10 @@
         {% for n in notifications %}
         <div class="notification-card notification-{{ n.type if n.type in ['success', 'warning'] else 'info' }}">
             <div style="display: flex; justify-content: space-between; margin-bottom: 0.3rem;">
-                <strong style="color: #fff; font-size: 1rem;">{{ n.title }}</strong>
+                <strong style="color: var(--text-light); font-size: 1rem;">{{ n.title }}</strong>
                 <span style="font-size: 0.75rem; color: var(--text-muted);">{{ n.created_at.strftime('%d %b %H:%M') if n.created_at else '' }}</span>
             </div>
-            <p style="color: #d1d1d6; font-size: 0.88rem; line-height: 1.5;">{{ n.message }}</p>
+            <p style="color: #40506d; font-size: 0.9rem; line-height: 1.55;">{{ n.message }}</p>
         </div>
         {% endfor %}
     </div>

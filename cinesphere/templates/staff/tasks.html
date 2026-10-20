@@ -81,7 +81,7 @@
                         </span>
                     </td>
                     <td>{{ t.created_by }}</td>
-                    <td><small style="color: #d1d1d6;">{{ t.notes or 'No notes logged yet' }}</small></td>
+                    <td><small style="color: var(--text-muted);">{{ t.notes or 'No notes logged yet' }}</small></td>
                 </tr>
                 {% else %}
                 <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No operational tasks active.</td></tr>

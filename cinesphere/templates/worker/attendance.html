@@ -1,29 +1,79 @@
 {% extends "base.html" %}
-{% block title %}Attendance - Worker Portal{% endblock %}
+{% block title %}My attendance — CineSphere{% endblock %}
 {% block content %}
-<div class="container" style="max-width:750px;">
-    <div class="section-header"><h1 class="section-title">My Attendance</h1></div>
-    <div class="form-card" style="padding:2rem; margin-bottom:2rem; text-align:center;">
+<div class="container worker-self-page">
+    <header class="page-heading worker-page-heading">
+        <div>
+            <span class="eyebrow">Private worker record</span>
+            <h1>My attendance</h1>
+            <p>Check in for today and review your own recent shift history.</p>
+        </div>
+        <a class="btn btn-outline" href="{{ url_for('worker.dashboard') }}">Back to dashboard</a>
+    </header>
+
+    <section class="worker-summary-grid" aria-label="Attendance summary for {{ attendance_summary.cycle }}">
+        <article class="worker-summary-card accent-blue">
+            <span>This month</span>
+            <strong>{{ attendance_summary.present_days }}</strong>
+            <small>present days</small>
+        </article>
+        <article class="worker-summary-card accent-purple">
+            <span>Scheduled</span>
+            <strong>{{ attendance_summary.scheduled_shifts }}</strong>
+            <small>eligible shifts</small>
+        </article>
+        <article class="worker-summary-card accent-green">
+            <span>Completed</span>
+            <strong>{{ attendance_summary.completed_shifts }}</strong>
+            <small>checked-out shifts</small>
+        </article>
+        <article class="worker-summary-card accent-coral">
+            <span>Attendance rate</span>
+            <strong>{% if attendance_summary.attendance_rate is not none %}{{ attendance_summary.attendance_rate }}%{% else %}N/A{% endif %}</strong>
+            <small>{% if attendance_summary.scheduled_shifts %}from approved schedule{% else %}no approved schedule yet{% endif %}</small>
+        </article>
+    </section>
+
+    <section class="worker-action-card" aria-labelledby="today-shift-title">
+        <div>
+            <span class="eyebrow">Today</span>
+            {% if not today_rec %}
+            <h2 id="today-shift-title">Your shift is not marked</h2>
+            <p>Record your arrival when you begin the assigned shift.</p>
+            {% elif not today_rec.check_out %}
+            <h2 id="today-shift-title">Checked in at {{ today_rec.check_in }}</h2>
+            <p>Your shift is active. Check out only when today’s work is complete.</p>
+            {% else %}
+            <h2 id="today-shift-title">Today’s shift is complete</h2>
+            <p>Checked in at {{ today_rec.check_in }} and checked out at {{ today_rec.check_out }}.</p>
+            {% endif %}
+        </div>
         {% if not today_rec %}
-        <h2>Today's shift is not marked</h2>
-        <p style="color:var(--text-muted);">Record your arrival for the assigned shift.</p>
         <form method="POST"><button class="btn btn-success" name="action" value="check_in" type="submit">Check in</button></form>
         {% elif not today_rec.check_out %}
-        <h2 style="color:var(--success);">Checked in at {{ today_rec.check_in }}</h2>
-        <p style="color:var(--text-muted);">Check out when your assigned shift is complete.</p>
         <form method="POST"><button class="btn btn-primary" name="action" value="check_out" type="submit">Check out</button></form>
         {% else %}
-        <h2 style="color:var(--success);">Shift completed</h2>
-        <p>Checked in: {{ today_rec.check_in }} | Checked out: {{ today_rec.check_out }}</p>
+        <span class="status-pill status-success">Completed</span>
         {% endif %}
-    </div>
-    <div class="table-responsive"><table class="custom-table">
-        <thead><tr><th>Date</th><th>Check In</th><th>Check Out</th><th>Status</th></tr></thead>
-        <tbody>
-        {% for r in records %}
-        <tr><td>{{ r.date }}</td><td>{{ r.check_in }}</td><td>{{ r.check_out or 'On Duty' }}</td><td>{{ r.status }}</td></tr>
-        {% else %}<tr><td colspan="4">No attendance records yet.</td></tr>{% endfor %}
-        </tbody>
-    </table></div>
+    </section>
+
+    <section class="table-card">
+        <div class="section-header">
+            <div><h2>Recent attendance</h2><p>Latest 60 records, newest first.</p></div>
+        </div>
+        <div class="table-responsive"><table class="custom-table">
+            <thead><tr><th>Date</th><th>Check in</th><th>Check out</th><th>Status</th></tr></thead>
+            <tbody>
+            {% for record in records %}
+            <tr>
+                <td>{{ record.date }}</td>
+                <td>{{ record.check_in or '—' }}</td>
+                <td>{{ record.check_out or ('On duty' if today_rec and record.date == today_rec.date and not today_rec.check_out else '—') }}</td>
+                <td><span class="status-pill {% if record.status in ['Present', 'Corrected Present'] %}status-success{% endif %}">{{ record.status }}</span></td>
+            </tr>
+            {% else %}<tr><td colspan="4" class="empty-cell">No attendance records yet.</td></tr>{% endfor %}
+            </tbody>
+        </table></div>
+    </section>
 </div>
 {% endblock %}

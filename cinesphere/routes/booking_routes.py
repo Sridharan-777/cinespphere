@@ -11,6 +11,7 @@ from cinesphere.services.stripe_service import stripe_service
 from cinesphere.services.reward_service import RewardService
 from cinesphere.services.membership_service import MembershipService
 from cinesphere.services.ticket_service import TicketService
+from cinesphere.services.availability_service import enrich_available_showtime
 from cinesphere.utils.audit import log_audit, create_notification
 
 booking_bp = Blueprint("booking", __name__)
@@ -53,10 +54,13 @@ def select_seats(showtime_id):
 
     if not showtime:
         return render_template("errors/404.html", message="Showtime not found"), 404
+    available_show = enrich_available_showtime(db, showtime)
+    if not available_show:
+        return render_template("errors/404.html", message="This showtime is no longer available."), 404
 
-    movie = db.movies.find_one({"_id": showtime["movie_id"]})
-    theater = db.theaters.find_one({"_id": showtime["theater_id"]})
-    screen = db.screens.find_one({"_id": showtime["screen_id"]})
+    movie = available_show["movie"]
+    theater = available_show["theater"]
+    screen = available_show["screen"]
 
     booked_seats = showtime.get("booked_seats", [])
 

@@ -1,5 +1,7 @@
 ﻿from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
 from datetime import UTC, datetime
+import re
+from flask import current_app, abort
 from bson import ObjectId
 from werkzeug.security import generate_password_hash
 from cinesphere.models.database import get_db
@@ -10,6 +12,7 @@ from cinesphere.services.tmdb_service import tmdb_service
 from cinesphere.utils.audit import log_audit
 from cinesphere.services.reward_service import RewardService
 from cinesphere.services.payroll_service import PayrollService
+from cinesphere.utils.media import youtube_embed_url
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -99,6 +102,7 @@ def edit_theater(theater_id):
         "city": request.form.get("city", "").strip(),
         "phone": request.form.get("phone", "").strip(),
         "email": request.form.get("email", "").strip(),
+        "status": request.form.get("status", "active") if request.form.get("status", "active") in {"active", "inactive"} else "active",
         "updated_at": datetime.now(UTC).replace(tzinfo=None)
     }
     if not updates["name"] or not updates["address"] or not updates["city"]:
@@ -145,7 +149,11 @@ def delete_theater(theater_id):
 @role_required("admin")
 def theater_details(theater_id):
     db = get_db()
-    t_id = ObjectId(theater_id)
+    try:
+        t_id = ObjectId(theater_id)
+    except Exception:
+        flash("Invalid theater identifier.", "danger")
+        return redirect(url_for("admin.theaters"))
     theater = db.theaters.find_one({"_id": t_id})
     if not theater:
         flash("Theater not found", "danger")
@@ -173,9 +181,18 @@ def staff_management():
         name = request.form.get("name", "").strip()
         email = request.form.get("email", "").strip().lower()
         phone = request.form.get("phone", "").strip()
-        theater_id = ObjectId(request.form.get("theater_id"))
+        try:
+            theater_id = ObjectId(request.form.get("theater_id", ""))
+        except Exception:
+            flash("Choose a valid active theater.", "danger")
+            return redirect(url_for("admin.staff_management"))
         designation = request.form.get("designation", "Operations Supervisor").strip()
         password = request.form.get("password", "Staff@1234").strip()
+
+        theater = db.theaters.find_one({"_id": theater_id, "status": "active"})
+        if not name or not email or len(password) < 8 or not theater:
+            flash("Name, email, an 8-character password, and an active theater are required.", "danger")
+            return redirect(url_for("admin.staff_management"))
 
         # Check existing staff count in this theater - STRICT MAX 5
         active_staff = db.staff.count_documents({"theater_id": theater_id, "status": "active"})
@@ -187,7 +204,6 @@ def staff_management():
             flash("A user with this email already exists.", "danger")
             return redirect(url_for("admin.staff_management"))
 
-        theater = db.theaters.find_one({"_id": theater_id})
         emp_code = f"STF-{active_staff + 1:03d}"
 
         u_res = db.users.insert_one({
@@ -224,7 +240,12 @@ def staff_management():
 @role_required("admin")
 def staff_toggle_status(staff_id):
     db = get_db()
-    staff_doc = db.staff.find_one({"_id": ObjectId(staff_id)})
+    try:
+        staff_object_id = ObjectId(staff_id)
+    except Exception:
+        flash("Invalid staff identifier.", "danger")
+        return redirect(url_for("admin.staff_management"))
+    staff_doc = db.staff.find_one({"_id": staff_object_id})
     if not staff_doc:
         flash("Staff member not found.", "danger")
         return redirect(url_for("admin.staff_management"))
@@ -319,6 +340,13 @@ def movies():
         if not title:
             flash("Movie title is required.", "danger")
             return redirect(url_for("admin.movies"))
+        status = request.form.get("status", "Catalog").strip()
+        status = status if status in {"Catalog", "Coming Soon", "Now Showing", "Archived"} else "Catalog"
+        supplied_trailer = request.form.get("trailer_url", "").strip()
+        trailer_url = youtube_embed_url(supplied_trailer)
+        if supplied_trailer and not trailer_url:
+            flash("Use a valid YouTube trailer URL or video ID.", "danger")
+            return redirect(url_for("admin.movies"))
         movie_doc = {
             "title": title,
             "original_title": request.form.get("original_title", title).strip() or title,
@@ -329,9 +357,10 @@ def movies():
             "director": request.form.get("director", "").strip(),
             "overview": request.form.get("overview", "").strip(),
             "release_date": request.form.get("release_date", "").strip(),
-            "status": request.form.get("status", "Now Showing").strip(),
+            "status": status,
             "poster_url": request.form.get("poster_url", "").strip() or url_for("static", filename="images/default_poster.svg"),
             "backdrop_url": request.form.get("backdrop_url", "").strip() or url_for("static", filename="images/default_backdrop.svg"),
+            "trailer_url": trailer_url,
             "cast": [], "writers": [], "vote_count": 0,
             "created_at": datetime.now(UTC).replace(tzinfo=None),
         }
@@ -340,7 +369,8 @@ def movies():
         flash(f"Movie {title} created successfully.", "success")
         return redirect(url_for("admin.movies"))
     movies_list = list(db.movies.find().sort("created_at", -1))
-    return render_template("admin/movies.html", movies=movies_list)
+    return render_template("admin/movies.html", movies=movies_list,
+                           tmdb_configured=tmdb_service.is_configured)
 
 @admin_bp.route("/admin/movies/<movie_id>/edit", methods=["POST"])
 @role_required("admin")
@@ -355,12 +385,27 @@ def movie_edit(movie_id):
     if not title:
         flash("Movie title is required.", "danger")
         return redirect(url_for("admin.movies"))
+    supplied_trailer = request.form.get("trailer_url", "").strip()
+    trailer_url = youtube_embed_url(supplied_trailer)
+    if supplied_trailer and not trailer_url:
+        flash("Use a valid YouTube trailer URL or video ID.", "danger")
+        return redirect(url_for("admin.movies"))
+    status = request.form.get("status", "Catalog").strip()
+    status = status if status in {"Catalog", "Coming Soon", "Now Showing", "Archived"} else "Catalog"
     updates = {
-        "title": title, "language": request.form.get("language", "English").strip(),
+        "title": title,
+        "original_title": request.form.get("original_title", title).strip() or title,
+        "language": request.form.get("language", "English").strip(),
+        "genres": [value.strip() for value in request.form.get("genres", "").split(",") if value.strip()],
         "runtime": max(0, request.form.get("runtime", type=int) or 0),
         "rating": min(10, max(0, request.form.get("rating", type=float) or 0)),
         "director": request.form.get("director", "").strip(),
-        "status": request.form.get("status", "Now Showing").strip(),
+        "overview": request.form.get("overview", "").strip(),
+        "release_date": request.form.get("release_date", "").strip(),
+        "poster_url": request.form.get("poster_url", "").strip() or url_for("static", filename="images/default_poster.svg"),
+        "backdrop_url": request.form.get("backdrop_url", "").strip() or url_for("static", filename="images/default_backdrop.svg"),
+        "trailer_url": trailer_url,
+        "status": status,
         "updated_at": datetime.now(UTC).replace(tzinfo=None),
     }
     result = db.movies.update_one({"_id": object_id}, {"$set": updates})
@@ -398,32 +443,22 @@ def movie_delete(movie_id):
 @role_required("admin")
 def sync_tmdb_movies():
     db = get_db()
-    count_synced = 0
     try:
-        popular = tmdb_service.get_popular_movies(page=1)
-        now_playing = tmdb_service.get_now_playing_movies(page=1)
-        all_raw = {m["id"]: m for m in (popular + now_playing)}.values()
-
-        for raw_movie in list(all_raw)[:15]:
-            tmdb_id = raw_movie.get("id")
-            # Fetch full details
-            full_detail = tmdb_service.get_movie_details(tmdb_id) or raw_movie
-            formatted = tmdb_service.format_movie_data(full_detail)
-            if not formatted:
-                continue
-
-            existing = db.movies.find_one({"tmdb_id": tmdb_id})
-            if existing:
-                db.movies.update_one({"tmdb_id": tmdb_id}, {"$set": formatted})
-            else:
-                formatted["created_at"] = datetime.now(UTC).replace(tzinfo=None)
-                db.movies.insert_one(formatted)
-            count_synced += 1
-
-        log_audit("ADMIN_SYNC_TMDB", "movie", None, f"Synced {count_synced} real movies from TMDB")
-        flash(f"Successfully synchronized {count_synced} real movies from TMDB API!", "success")
-    except Exception as e:
-        flash(f"Error synchronizing movies from TMDB: {e}", "danger")
+        from cinesphere.scripts.sync_movies import sync_movies
+        queries = [value.strip() for value in re.split(r"[,\n]", request.form.get("queries", "")) if value.strip()]
+        result = sync_movies(queries, db)
+        if result["error"]:
+            flash(result["error"] + " Add the TMDB key to .env, restart, and retry.", "danger")
+            return redirect(url_for("admin.movies"))
+        log_audit("ADMIN_SYNC_TMDB", "movie", None,
+                  f"Synced {result['synced']} TMDB movies; requested={queries[:10]}")
+        message = f"Synchronized {result['synced']} recent and upcoming Indian movies from TMDB."
+        if result["requested_missing"]:
+            message += " No match for: " + ", ".join(result["requested_missing"])
+        flash(message, "warning" if result["requested_missing"] else "success")
+    except Exception:
+        current_app.logger.exception("TMDB catalog synchronization failed")
+        flash("TMDB synchronization failed. Check the server log and provider configuration.", "danger")
 
     return redirect(url_for("admin.movies"))
 
@@ -442,7 +477,18 @@ def reviews_moderation():
 def moderate_review(review_id):
     db = get_db()
     action = request.form.get("action") # Published, Rejected, Flagged
-    db.reviews.update_one({"_id": ObjectId(review_id)}, {"$set": {"status": action}})
+    if action not in {"Published", "Rejected", "Flagged"}:
+        flash("Invalid moderation action.", "danger")
+        return redirect(url_for("admin.reviews_moderation"))
+    try:
+        review_oid = ObjectId(review_id)
+    except Exception:
+        flash("Invalid review identifier.", "danger")
+        return redirect(url_for("admin.reviews_moderation"))
+    result = db.reviews.update_one({"_id": review_oid}, {"$set": {"status": action}})
+    if not result.matched_count:
+        flash("Review not found.", "warning")
+        return redirect(url_for("admin.reviews_moderation"))
     log_audit("ADMIN_MODERATE_REVIEW", "review", review_id, f"Review set to {action}")
     flash(f"Review marked as {action}.", "info")
     return redirect(url_for("admin.reviews_moderation"))
@@ -618,6 +664,7 @@ def user_edit(user_id):
         return redirect(url_for("admin.users_list"))
     name = request.form.get("name", "").strip()
     email = request.form.get("email", "").strip().lower()
+    phone = request.form.get("phone", user.get("phone", "")).strip()
     status = request.form.get("status", "active")
     if not name or not email or status not in {"active", "inactive"}:
         flash("Valid name, email, and status are required.", "danger")
@@ -632,7 +679,7 @@ def user_edit(user_id):
     if db.users.find_one({"email": email, "_id": {"$ne": object_id}}):
         flash("Another user already uses this email address.", "danger")
         return redirect(url_for("admin.users_list"))
-    updates = {"name": name, "email": email, "status": status,
+    updates = {"name": name, "email": email, "phone": phone, "status": status,
                "updated_at": datetime.now(UTC).replace(tzinfo=None)}
     password = request.form.get("password", "").strip()
     if password:
@@ -644,7 +691,7 @@ def user_edit(user_id):
     profile_collection = {"customer": db.customers, "staff": db.staff}.get(user.get("role"))
     if profile_collection is not None:
         profile_collection.update_one({"user_id": object_id}, {"$set": {
-            "name": name, "email": email, "status": status, "updated_at": updates["updated_at"]
+            "name": name, "email": email, "phone": phone, "status": status, "updated_at": updates["updated_at"]
         }})
     if status == "inactive":
         db.user_sessions.update_many({"user_id": object_id, "status": "active"}, {"$set": {
@@ -773,17 +820,24 @@ def operations_worker_create():
 @admin_bp.route("/admin/operations/workers/<worker_id>", methods=["POST"])
 @role_required("admin")
 def operations_worker_update(worker_id):
-    db = get_db(); oid = ObjectId(worker_id); salary = request.form.get("salary", type=float) or 22000
-    db.users.update_one({"_id": oid, "role": "worker"}, {"$set": {"name": request.form.get("name", "").strip(),
+    db = get_db()
+    try: oid = ObjectId(worker_id)
+    except Exception: abort(404)
+    salary = request.form.get("salary", type=float) or 22000
+    result = db.users.update_one({"_id": oid, "role": "worker"}, {"$set": {"name": request.form.get("name", "").strip(),
         "status": request.form.get("status", "active"), "worker_profile.department": request.form.get("department", ""),
         "worker_profile.monthly_salary": salary, "worker_profile.hourly_rate": round(salary / 160, 2),
         "worker_profile.bonus_coins": request.form.get("bonus_coins", type=int) or 0}})
-    flash("Worker updated.", "success"); return redirect(url_for("admin.operations"))
+    flash("Worker updated." if result.matched_count else "Worker not found.", "success" if result.matched_count else "warning")
+    return redirect(url_for("admin.operations"))
 
 @admin_bp.route("/admin/operations/workers/<worker_id>/delete", methods=["POST"])
 @role_required("admin")
 def operations_worker_delete(worker_id):
-    db = get_db(); oid = ObjectId(worker_id); now = datetime.now(UTC).replace(tzinfo=None)
+    db = get_db()
+    try: oid = ObjectId(worker_id)
+    except Exception: abort(404)
+    now = datetime.now(UTC).replace(tzinfo=None)
     result = db.users.update_one({"_id": oid, "role": "worker"}, {"$set": {"status": "inactive", "deactivated_at": now}})
     if result.modified_count:
         db.user_sessions.update_many({"user_id": oid, "status": "active"}, {"$set": {"status": "revoked", "logout_at": now}})
@@ -809,9 +863,12 @@ def operations_attendance_delete(record_id):
     if not reason:
         flash("Attendance corrections require a reason; the original record is preserved.", "danger")
     else:
-        get_db().attendance.update_one({"_id": ObjectId(record_id)}, {"$set": {"status": "Voided by correction",
+        try: attendance_oid = ObjectId(record_id)
+        except Exception: abort(404)
+        result = get_db().attendance.update_one({"_id": attendance_oid}, {"$set": {"status": "Voided by correction",
             "correction_reason": reason, "corrected_by": ObjectId(session["user_id"]),
             "corrected_at": datetime.now(UTC).replace(tzinfo=None)}})
+        if not result.matched_count: abort(404)
         log_audit("ADMIN_CORRECT_ATTENDANCE", "attendance", record_id, reason)
         flash("Attendance record voided with correction history.", "success")
     return redirect(url_for("admin.operations"))
@@ -830,16 +887,22 @@ def operations_task_create():
 @admin_bp.route("/admin/operations/tasks/<task_id>", methods=["POST"])
 @role_required("admin")
 def operations_task_update(task_id):
-    get_db().tasks.update_one({"_id": ObjectId(task_id)}, {"$set": {"title": request.form.get("title", "").strip(),
+    try: task_oid = ObjectId(task_id)
+    except Exception: abort(404)
+    result = get_db().tasks.update_one({"_id": task_oid}, {"$set": {"title": request.form.get("title", "").strip(),
         "status": request.form.get("status", "Pending"), "priority": request.form.get("priority", "Medium")}})
+    if not result.matched_count: abort(404)
     flash("Task updated.", "success"); return redirect(url_for("admin.operations"))
 
 @admin_bp.route("/admin/operations/tasks/<task_id>/delete", methods=["POST"])
 @role_required("admin")
 def operations_task_delete(task_id):
     reason = request.form.get("reason", "").strip() or "Administrative cancellation"
-    get_db().tasks.update_one({"_id": ObjectId(task_id), "status": {"$ne": "Completed"}}, {"$set": {
+    try: task_oid = ObjectId(task_id)
+    except Exception: abort(404)
+    result = get_db().tasks.update_one({"_id": task_oid, "status": {"$ne": "Completed"}}, {"$set": {
         "status": "Cancelled", "cancelled_reason": reason, "cancelled_at": datetime.now(UTC).replace(tzinfo=None)}})
+    if not result.matched_count: abort(404)
     log_audit("ADMIN_CANCEL_TASK", "task", task_id, reason)
     flash("Task cancelled; its history was preserved.", "success"); return redirect(url_for("admin.operations"))
 
@@ -858,7 +921,10 @@ def operations_booking_delete(booking_id):
 @admin_bp.route("/admin/operations/rewards/create", methods=["POST"])
 @role_required("admin")
 def operations_reward_create():
-    db = get_db(); user_id = ObjectId(request.form.get("user_id")); amount = request.form.get("amount", type=int) or 0
+    db = get_db()
+    try: user_id = ObjectId(request.form.get("user_id", ""))
+    except Exception: abort(404)
+    amount = request.form.get("amount", type=int) or 0
     user = db.users.find_one({"_id": user_id})
     if not user: abort(404)
     if user.get("role") == "customer": db.customers.update_one({"user_id": user_id}, {"$inc": {"loyalty_points": amount}})

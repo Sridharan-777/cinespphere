@@ -41,12 +41,15 @@ class BookingService:
         normalized = [str(seat).strip().upper() for seat in seat_numbers if str(seat).strip()]
         if not normalized or len(normalized) != len(set(normalized)) or len(normalized) > 10:
             return None, "Select between one and ten unique seats."
-        showtime = db.showtimes.find_one({"_id": showtime_oid, "status": "active"})
+        today = datetime.now(UTC).replace(tzinfo=None).strftime("%Y-%m-%d")
+        showtime = db.showtimes.find_one({"_id": showtime_oid, "status": "active",
+                                          "show_date": {"$gte": today}})
         if not showtime:
             return None, "Showtime is unavailable."
         theater = db.theaters.find_one({"_id": showtime.get("theater_id"), "status": "active"})
-        screen = db.screens.find_one({"_id": showtime.get("screen_id"), "status": "active"})
-        movie = db.movies.find_one({"_id": showtime.get("movie_id")})
+        screen = db.screens.find_one({"_id": showtime.get("screen_id"),
+                                      "theater_id": showtime.get("theater_id"), "status": "active"})
+        movie = db.movies.find_one({"_id": showtime.get("movie_id"), "status": {"$ne": "Archived"}})
         user = db.users.find_one({"_id": customer_oid, "status": "active"})
         if not theater or not screen or not movie or not user:
             return None, "Show or account details are incomplete."

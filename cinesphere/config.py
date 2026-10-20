@@ -21,6 +21,7 @@ class Config:
     STRIPE_PUBLIC_KEY = os.getenv("STRIPE_PUBLIC_KEY", "")
     STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
     RECENT_RELEASE_DAYS = int(os.getenv("RECENT_RELEASE_DAYS", "120"))
+    TMDB_SYNC_PAGES = max(1, min(10, int(os.getenv("TMDB_SYNC_PAGES", "3"))))
     AI_PROVIDER_API_KEY = os.getenv("AI_PROVIDER_API_KEY", "")
     
     # Session security

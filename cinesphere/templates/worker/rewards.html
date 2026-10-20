@@ -1,21 +1,80 @@
 {% extends "base.html" %}
-{% block title %}My excellence rewards — CineSphere{% endblock %}
+{% block title %}My rewards — CineSphere{% endblock %}
 {% block content %}
-<div class="container">
-    <header class="page-heading"><span class="eyebrow">Private worker record</span><h1>Excellence rewards</h1>
-        <p>Your evidence, policy status, awards, and admission-credit ledger.</p></header>
-    {% if policy.status != 'active' %}<div class="state-card state-warning"><strong>Draft policy</strong><p>{{ policy.notes }}</p></div>{% endif %}
-    <div class="dashboard-grid">
-        <div class="stat-card"><div class="stat-title">Eligible scheduled shifts</div><div class="stat-value">{{ eligibility.eligible_shifts }}</div></div>
-        <div class="stat-card"><div class="stat-title">Attendance reliability</div><div class="stat-value">{{ eligibility.attendance_score if eligibility.attendance_score is not none else 'N/A' }}{% if eligibility.attendance_score is not none %}%{% endif %}</div></div>
-        <div class="stat-card"><div class="stat-title">Verified maintenance evidence</div><div class="stat-value">{{ eligibility.verified_tasks }}</div></div>
-        <div class="stat-card"><div class="stat-title">Verified quality</div><div class="stat-value">{{ eligibility.quality_score if eligibility.quality_score is not none else 'N/A' }}{% if eligibility.quality_score is not none %}%{% endif %}</div></div>
-    </div>
-    {% for reason in eligibility.reasons %}<p class="inline-notice">{{ reason }}</p>{% endfor %}
-    <section class="table-card"><div class="section-header"><h2>Admission-credit ledger</h2><a class="btn btn-primary btn-sm" href="{{ url_for('movies.movie_list') }}">Find an eligible show</a></div>
-        <div class="table-responsive"><table class="custom-table"><thead><tr><th>Cycle</th><th>Status</th><th>Issued</th><th>Expires</th><th>Employer-funded value</th></tr></thead><tbody>
-        {% for credit in credits %}<tr><td>{{ credit.cycle }}</td><td>{{ credit.status }}</td><td>{{ credit.issued_at.strftime('%d %b %Y') }}</td><td>{{ credit.expires_at.strftime('%d %b %Y') }}</td><td>{% if credit.employer_funded_value is defined %}₹{{ credit.employer_funded_value }}{% else %}—{% endif %}</td></tr>
-        {% else %}<tr><td colspan="5" class="empty-cell">No credits have been issued.</td></tr>{% endfor %}</tbody></table></div>
+<div class="container worker-self-page">
+    <header class="page-heading worker-page-heading">
+        <div>
+            <span class="eyebrow">Private worker record</span>
+            <h1>My rewards</h1>
+            <p>See available movie credits, bonus coins, eligibility evidence, and award decisions.</p>
+        </div>
+        {% if reward_summary.available %}<a class="btn btn-primary" href="{{ url_for('movies.movie_list') }}">Use available reward</a>{% endif %}
+    </header>
+
+    {% if policy.status != 'active' %}
+    <div class="state-card state-warning"><strong>Reward policy is not active</strong><p>{{ policy.notes }}</p></div>
+    {% endif %}
+
+    <section class="worker-summary-grid" aria-label="Reward balance">
+        <article class="worker-summary-card accent-green">
+            <span>Available credits</span><strong>{{ reward_summary.available }}</strong><small>ready to use</small>
+        </article>
+        <article class="worker-summary-card accent-blue">
+            <span>Reserved</span><strong>{{ reward_summary.reserved }}</strong><small>held for checkout</small>
+        </article>
+        <article class="worker-summary-card accent-purple">
+            <span>Used credits</span><strong>{{ reward_summary.used }}</strong><small>completed rewards</small>
+        </article>
+        <article class="worker-summary-card accent-coral">
+            <span>Bonus coins</span><strong>{{ reward_summary.coins }}</strong><small>current balance</small>
+        </article>
+    </section>
+
+    <section class="worker-detail-card">
+        <div class="section-header worker-card-heading">
+            <div><h2>{{ eligibility.cycle }} eligibility</h2><p>Evidence used for the current excellence-reward cycle.</p></div>
+            <span class="status-pill {% if eligibility.eligible %}status-success{% else %}status-draft{% endif %}">
+                {{ 'Eligible' if eligibility.eligible else 'Building evidence' }}
+            </span>
+        </div>
+        <div class="worker-evidence-grid">
+            <div><span>Eligible shifts</span><strong>{{ eligibility.eligible_shifts }}</strong></div>
+            <div><span>Attendance</span><strong>{{ eligibility.attendance_score if eligibility.attendance_score is not none else 'N/A' }}{% if eligibility.attendance_score is not none %}%{% endif %}</strong></div>
+            <div><span>Verified tasks</span><strong>{{ eligibility.verified_tasks }}</strong></div>
+            <div><span>Quality score</span><strong>{{ eligibility.quality_score if eligibility.quality_score is not none else 'N/A' }}{% if eligibility.quality_score is not none %}%{% endif %}</strong></div>
+        </div>
+        {% for reason in eligibility.reasons %}<p class="inline-notice">{{ reason }}</p>{% endfor %}
+    </section>
+
+    <section class="table-card">
+        <div class="section-header"><div><h2>Available reward credits</h2><p>Admission credits can be used only before their expiry date.</p></div></div>
+        <div class="table-responsive"><table class="custom-table">
+            <thead><tr><th>Cycle</th><th>Status</th><th>Issued</th><th>Expires</th><th>Value used</th></tr></thead>
+            <tbody>
+            {% for credit in credits %}
+            {% set is_expired = credit.status == 'available' and credit.expires_at and credit.expires_at <= now %}
+            <tr>
+                <td>{{ credit.cycle }}</td>
+                <td><span class="status-pill {% if credit.status == 'available' and not is_expired %}status-success{% endif %}">{{ 'expired' if is_expired else credit.status }}</span></td>
+                <td>{{ credit.issued_at.strftime('%d %b %Y') if credit.issued_at else '—' }}</td>
+                <td>{{ credit.expires_at.strftime('%d %b %Y') if credit.expires_at else '—' }}</td>
+                <td>{% if credit.employer_funded_value is defined %}₹{{ '%.2f'|format(credit.employer_funded_value|float) }}{% else %}—{% endif %}</td>
+            </tr>
+            {% else %}<tr><td colspan="5" class="empty-cell">No reward credits have been issued yet.</td></tr>{% endfor %}
+            </tbody>
+        </table></div>
+    </section>
+
+    <section class="table-card">
+        <div class="section-header"><div><h2>Award history</h2><p>Your recommendations and final decisions.</p></div></div>
+        <div class="table-responsive"><table class="custom-table">
+            <thead><tr><th>Cycle</th><th>Status</th><th>Decision reason</th><th>Issued</th></tr></thead>
+            <tbody>
+            {% for award in awards %}
+            <tr><td>{{ award.cycle }}</td><td><span class="status-pill {% if award.status in ['Approved', 'Issued'] %}status-success{% endif %}">{{ award.status }}</span></td><td>{{ award.review_reason or 'Awaiting review' }}</td><td>{{ award.issued_at.strftime('%d %b %Y') if award.issued_at else '—' }}</td></tr>
+            {% else %}<tr><td colspan="4" class="empty-cell">No reward recommendations yet.</td></tr>{% endfor %}
+            </tbody>
+        </table></div>
     </section>
 </div>
 {% endblock %}

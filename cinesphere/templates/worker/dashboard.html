@@ -40,60 +40,53 @@
         <small style="color:var(--text-muted);">Active workers only. Subject to seat availability. Cancelled tickets do not consume allowance.</small>
     </div>
 
-    <!-- Salary & Patron Footfall Analytics Section -->
+    <!-- Worker self-service and theater operations overview -->
     <div class="dashboard-grid">
-        <!-- Monthly Salary Card -->
-        <div class="stat-card" style="border-top: 3px solid #22c55e;">
-            <div class="stat-title">Monthly Compensation</div>
-            <div class="stat-value" style="color: #22c55e;">₹{{ worker.monthly_salary or 22000 }}</div>
+        <a class="stat-card worker-dashboard-link" href="{{ url_for('worker.payroll') }}" style="border-top: 3px solid #158f70;">
+            <div class="stat-title">My monthly salary</div>
+            <div class="stat-value" style="color: #0d7257;">₹{{ '%.2f'|format((worker.monthly_salary or 0)|float) }}</div>
             <div style="margin-top: 0.5rem; font-size: 0.82rem; color: var(--text-muted);">
-                Hourly Rate: <strong>₹{{ worker.hourly_rate or 137.5 }} / hr</strong><br>
-                Payment status and approved payslips are available in My Payslips. No bank account details are exposed here.
+                {% if worker_metrics.latest_payroll %}Latest payslip: <strong>{{ worker_metrics.latest_payroll.period }} · {{ worker_metrics.latest_payroll.status }}</strong>{% else %}No approved payslip yet{% endif %}<br>
+                View salary and payslips →
             </div>
-        </div>
+        </a>
 
-        <!-- Theater Footfall & Patron Attendance -->
+        <a class="stat-card worker-dashboard-link" href="{{ url_for('worker.attendance') }}" style="border-top: 3px solid #2869d8;">
+            <div class="stat-title">My attendance</div>
+            <div class="stat-value" style="color:#1e5bb8;">{{ worker_metrics.attendance_percentage }}%</div>
+            <small>{{ worker_metrics.attended_days }} present days out of {{ worker_metrics.working_days }} working days this month<br>Open attendance →</small>
+        </a>
+
+        <a class="stat-card worker-dashboard-link" href="{{ url_for('worker.rewards') }}" style="border-top: 3px solid #6c4ce8;">
+            <div class="stat-title">Available rewards</div>
+            <div class="stat-value" style="color:#5a3fc0;">{{ worker_metrics.available_rewards }}</div>
+            <small>{{ worker_metrics.rewards_collected }} used · {{ worker_metrics.reward_coins }} bonus coins<br>View rewards →</small>
+        </a>
+
         <div class="stat-card" style="border-top: 3px solid #3b82f6;">
             <div class="stat-title">Today's Theater Footfall</div>
-            <div class="stat-value" style="color: #60a5fa;">{{ patron_stats.today_patrons }} <span style="font-size: 1rem; font-weight: 500; color: var(--text-muted);">patrons</span></div>
+            <div class="stat-value" style="color: #1e5bb8;">{{ patron_stats.today_patrons }} <span style="font-size: 1rem; font-weight: 500; color: var(--text-muted);">patrons</span></div>
             <div style="margin-top: 0.5rem; font-size: 0.82rem; color: var(--text-muted);">
                 Audience booked across <strong>{{ patron_stats.active_shows }} scheduled shows</strong> today.
             </div>
         </div>
 
-        <!-- Total Approaching Patrons (Lifetime) -->
         <div class="stat-card" style="border-top: 3px solid #f59e0b;">
             <div class="stat-title">Total Approaching Customers</div>
-            <div class="stat-value" style="color: #fcd34d;">{{ patron_stats.total_patrons }} <span style="font-size: 1rem; font-weight: 500; color: var(--text-muted);">customers</span></div>
+            <div class="stat-value" style="color: #8b5a0b;">{{ patron_stats.total_patrons }} <span style="font-size: 1rem; font-weight: 500; color: var(--text-muted);">customers</span></div>
             <div style="margin-top: 0.5rem; font-size: 0.82rem; color: var(--text-muted);">
                 Lifetime reserved seats serviced by this theater location.
             </div>
         </div>
 
-        <!-- Shift Schedule -->
         <div class="stat-card" style="border-top: 3px solid #a855f7;">
             <div class="stat-title">Assigned Shift Schedule</div>
-            <div class="stat-value" style="font-size: 1.35rem; color: #c084fc; margin-top: 0.8rem;">
+            <div class="stat-value" style="font-size: 1.35rem; color: #5a3fc0; margin-top: 0.8rem;">
                 {{ worker.shift_timings or '09:00 AM - 05:30 PM' }}
             </div>
             <div style="margin-top: 0.5rem; font-size: 0.82rem; color: var(--text-muted);">
                 Shift Status: <strong>{% if attendance %}Active On Duty{% else %}Awaiting Check-In{% endif %}</strong>
             </div>
-        </div>
-        <div class="stat-card" style="border-top: 3px solid #06b6d4;">
-            <div class="stat-title">Attendance Percentage</div>
-            <div class="stat-value" style="color:#67e8f9;">{{ worker_metrics.attendance_percentage }}%</div>
-            <small style="color:var(--text-muted);">{{ worker_metrics.attended_days }} present days out of {{ worker_metrics.working_days }} working days this month</small>
-        </div>
-        <div class="stat-card" style="border-top: 3px solid #f97316;">
-            <div class="stat-title">Rewards Collected</div>
-            <div class="stat-value" style="color:#fdba74;">{{ worker_metrics.rewards_collected }}</div>
-            <small style="color:var(--text-muted);">Earned by completing assigned duties</small>
-        </div>
-        <div class="stat-card" style="border-top: 3px solid #eab308;">
-            <div class="stat-title">Coin Rewards</div>
-            <div class="stat-value" style="color:#fde047;">{{ worker_metrics.reward_coins }} coins</div>
-            <small style="color:var(--text-muted);">10 coins awarded per completed task</small>
         </div>
     </div>
 
@@ -112,7 +105,7 @@
                 </div>
                 <div style="display: flex; gap: 0.5rem;">
                     <span class="badge" style="background: rgba(245, 158, 11, 0.2); color: #fcd34d;">Priority: {{ t.priority }}</span>
-                    <span class="badge" style="background: rgba(59, 130, 246, 0.2); color: #93c5fd;">Status: {{ t.status }}</span>
+                    <span class="badge" style="background: rgba(59, 130, 246, 0.2); color: #1e5bb8;">Status: {{ t.status }}</span>
                 </div>
             </div>
 
@@ -121,7 +114,7 @@
                 <input type="text" name="notes" class="form-control" placeholder="Add progress notes or evidence description..." style="flex: 1;" value="{{ t.notes }}">
                 
                 {% if t.status == 'Pending' or t.status == 'Assigned' %}
-                <button type="submit" name="status" value="In Progress" class="btn btn-outline" style="border-color: #3b82f6; color: #93c5fd;">
+                <button type="submit" name="status" value="In Progress" class="btn btn-outline" style="border-color: #3b82f6; color: #1e5bb8;">
                     ▶ Start Task
                 </button>
                 {% endif %}

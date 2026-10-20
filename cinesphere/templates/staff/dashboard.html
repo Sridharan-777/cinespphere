@@ -7,11 +7,12 @@
     <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 2rem; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
         <div>
             <span class="chip" style="background: #2563eb; color: #fff; margin-bottom: 0.5rem; display: inline-block;">STAFF OPERATIONS CONSOLE</span>
+            <span class="status-pill {% if operations.theater_available %}status-success{% else %}status-draft{% endif %}" style="margin-left:.4rem;">{{ 'Theater available' if operations.theater_available else 'Theater unavailable' }}</span>
             <h1 style="font-size: 2rem; font-family: var(--font-heading);">{{ theater.name if theater else 'CineSphere' }}</h1>
             <p style="color: var(--text-muted); font-size: 0.9rem;">Assigned Location • Max 5 Staff • Max 20 Field Workers Policy Enforced</p>
         </div>
         <div style="display: flex; gap: 0.8rem;">
-            <a href="{{ url_for('staff.shows_list') }}" class="btn btn-primary">Schedule Show</a>
+            {% if operations.theater_available %}<a href="{{ url_for('staff.show_create') }}" class="btn btn-primary">Schedule Show</a>{% endif %}
             <a href="{{ url_for('staff.tasks') }}" class="btn btn-outline">Assign Task</a>
         </div>
     </div>
@@ -19,9 +20,9 @@
     <!-- Capacity & Financial Stats -->
     <div class="dashboard-grid">
         <div class="stat-card" style="border-top: 3px solid #2563eb;">
-            <div class="stat-title">Shows Today</div>
-            <div class="stat-value">{{ operations.shows_today }}</div>
-            <span style="font-size: 0.75rem; color: var(--text-muted);">Scheduled at this location</span>
+            <div class="stat-title">Available Shows</div>
+            <div class="stat-value">{{ operations.upcoming_available_shows }}</div>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">Upcoming shows customers can book</span>
         </div>
 
         <div class="stat-card" style="border-top: 3px solid #d97706;">
@@ -97,7 +98,7 @@
                     <td>{{ b.show_date }} {{ b.start_time }}</td>
                     <td><strong style="color: var(--accent);">{{ b.seats|join(', ') }}</strong></td>
                     <td>₹{{ b.pricing.grand_total }}</td>
-                    <td><span class="badge" style="background: rgba(34, 197, 94, 0.2); color: #86efac;">{{ b.status }}</span></td>
+                    <td><span class="badge" style="background: rgba(34, 197, 94, 0.2); color: #0d7257;">{{ b.status }}</span></td>
                 </tr>
                 {% else %}
                 <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">No bookings recorded for this location yet.</td></tr>

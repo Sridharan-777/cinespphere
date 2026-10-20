@@ -44,7 +44,7 @@
     <div class="dashboard-grid" style="margin-top: 1rem;">
         <div class="stat-card">
             <div class="stat-title">Screen Utilization</div>
-            <div class="stat-value" style="font-size: 1.6rem; color: #fff;">{{ stats.screens_count }} Screens Active</div>
+            <div class="stat-value" style="font-size: 1.6rem; color: var(--text-light);">{{ stats.screens_count }} Screens Active</div>
             <div style="height: 6px; background: var(--bg-secondary); border-radius: 3px; margin-top: 0.8rem; overflow: hidden;">
                 <div style="width: 100%; height: 100%; background: #22c55e;"></div>
             </div>
@@ -105,7 +105,7 @@
                     <td>{{ b.payment_method }}</td>
                     <td><small style="color: var(--text-muted);">{{ b.razorpay_payment_id or b.transaction_id or 'Auto-captured' }}</small></td>
                     <td>
-                        <span class="badge" style="background: rgba(34, 197, 94, 0.2); color: #86efac;">
+                        <span class="badge" style="background: rgba(34, 197, 94, 0.2); color: #0d7257;">
                             {{ b.status }}
                         </span>
                     </td>

@@ -6,7 +6,10 @@ from cinesphere.models.database import get_db
 def worker_query(theater_id=None, active_only=False):
     query = {"role": "worker", "worker_profile": {"$exists": True}}
     if theater_id is not None:
-        query["worker_profile.theater_id"] = ObjectId(theater_id)
+        try:
+            query["worker_profile.theater_id"] = ObjectId(theater_id)
+        except Exception:
+            return None
     if active_only:
         query["status"] = "active"
     return query
@@ -31,19 +34,28 @@ def as_worker(user):
 
 def find_worker(user_id, theater_id=None, active_only=False):
     query = worker_query(theater_id, active_only)
-    query["_id"] = ObjectId(user_id)
+    if query is None:
+        return None
+    try:
+        query["_id"] = ObjectId(user_id)
+    except Exception:
+        return None
     return as_worker(get_db().users.find_one(query))
 
 
 def list_workers(theater_id=None, active_only=False, limit=None):
-    cursor = get_db().users.find(worker_query(theater_id, active_only)).sort("created_at", -1)
+    query = worker_query(theater_id, active_only)
+    if query is None:
+        return []
+    cursor = get_db().users.find(query).sort("created_at", -1)
     if limit:
         cursor = cursor.limit(limit)
     return [as_worker(user) for user in cursor]
 
 
 def count_workers(theater_id=None, active_only=False):
-    return get_db().users.count_documents(worker_query(theater_id, active_only))
+    query = worker_query(theater_id, active_only)
+    return get_db().users.count_documents(query) if query is not None else 0
 
 
 def update_worker(user_id, fields):

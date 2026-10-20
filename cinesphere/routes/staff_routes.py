@@ -9,6 +9,8 @@ from cinesphere.services.report_service import ReportService
 from cinesphere.utils.audit import log_audit
 from cinesphere.services.reward_service import RewardService
 from cinesphere.services.payroll_service import PayrollService
+from cinesphere.utils.media import youtube_embed_url
+from cinesphere.services.availability_service import list_available_showtimes
 
 import os
 from uuid import uuid4
@@ -46,6 +48,9 @@ def dashboard():
 
     theater_id = staff["theater_id"]
     theater = db.theaters.find_one({"_id": theater_id})
+    if not theater:
+        flash("Your assigned theater could not be found. Contact an administrator.", "warning")
+        return render_template("errors/403.html"), 403
 
     # Stats for this theater
     stats = ReportService.get_theater_stats(theater_id)
@@ -72,6 +77,9 @@ def dashboard():
         "shows_today": len(today_shows),
         "seats_reserved": today_reserved,
         "occupancy_today": round((today_reserved / today_capacity) * 100, 1) if today_capacity else 0,
+        "theater_available": theater.get("status") == "active" and db.screens.count_documents({
+            "theater_id": theater_id, "status": "active"}) > 0,
+        "upcoming_available_shows": len(list_available_showtimes(db, {"theater_id": theater_id})),
     }
 
     return render_template("staff/dashboard.html",
@@ -276,7 +284,13 @@ def show_create():
     db = get_db()
     uid = ObjectId(session["user_id"])
     staff = db.staff.find_one({"user_id": uid})
+    if not staff:
+        abort(403)
     theater_id = staff["theater_id"]
+    theater = db.theaters.find_one({"_id": theater_id, "status": "active"})
+    if not theater:
+        flash("This theater is currently unavailable. Ask an administrator to reactivate it before scheduling shows.", "warning")
+        return redirect(url_for("staff.dashboard"))
 
     if request.method == "POST":
         try:
@@ -288,9 +302,9 @@ def show_create():
         show_date = request.form.get("show_date")
         start_time = request.form.get("start_time")
         end_time = request.form.get("end_time")
-        base_price = float(request.form.get("base_price", 200))
+        base_price = request.form.get("base_price", type=float) or 200
 
-        if not db.movies.find_one({"_id": movie_id}) or not db.screens.find_one({"_id": screen_id, "theater_id": theater_id, "status": "active"}):
+        if not db.movies.find_one({"_id": movie_id, "status": {"$ne": "Archived"}}) or not db.screens.find_one({"_id": screen_id, "theater_id": theater_id, "status": "active"}):
             flash("The selected movie or screen is not available for your theater.", "danger")
             return redirect(url_for("staff.show_create"))
 
@@ -323,7 +337,7 @@ def show_create():
         flash("New movie showtime successfully scheduled!", "success")
         return redirect(url_for("staff.shows_list"))
 
-    movies = list(db.movies.find())
+    movies = list(db.movies.find({"status": {"$ne": "Archived"}}).sort("release_date", -1))
     screens = list(db.screens.find({"theater_id": theater_id, "status": "active"}))
     return render_template("staff/show_form.html", movies=movies, screens=screens)
 
@@ -626,14 +640,58 @@ def movies():
             filename = f"{uuid4().hex}{ext}"
             poster.save(os.path.join(upload_dir, filename))
             poster_url = url_for("static", filename=f"uploads/posters/{filename}")
-        db.movies.insert_one({"title": title, "original_title": title,
+        supplied_trailer = request.form.get("trailer_url", "").strip()
+        trailer_url = youtube_embed_url(supplied_trailer)
+        if supplied_trailer and not trailer_url:
+            flash("Use a valid YouTube trailer URL or video ID.", "danger")
+            return redirect(url_for("staff.movies"))
+        status = request.form.get("status", "Catalog")
+        status = status if status in {"Catalog", "Now Showing", "Coming Soon"} else "Catalog"
+        result = db.movies.insert_one({"title": title, "original_title": title,
             "language": request.form.get("language", "English").strip(),
             "genres": [x.strip() for x in request.form.get("genres", "").split(",") if x.strip()],
             "runtime": request.form.get("runtime", type=int) or 0, "rating": 0,
             "director": request.form.get("director", "").strip(), "overview": request.form.get("overview", "").strip(),
-            "release_date": request.form.get("release_date", ""), "status": request.form.get("status", "Now Showing"),
-            "poster_url": poster_url, "cast": [], "created_by_staff": ObjectId(session["user_id"]),
+            "release_date": request.form.get("release_date", ""), "status": status,
+            "poster_url": poster_url, "trailer_url": trailer_url, "cast": [], "created_by_staff": ObjectId(session["user_id"]),
             "created_at": datetime.now(UTC).replace(tzinfo=None)})
+        log_audit("STAFF_CREATE_MOVIE", "movie", result.inserted_id,
+                  f"Staff created catalog entry {title}")
         flash("Movie added with poster.", "success")
         return redirect(url_for("staff.movies"))
-    return render_template("staff/movies.html", movies=list(db.movies.find().sort("created_at", -1)))
+    return render_template("staff/movies.html", movies=list(db.movies.find().sort("created_at", -1)),
+                           staff_user_id=ObjectId(session["user_id"]))
+
+
+@staff_bp.route("/staff/movies/<movie_id>/delete", methods=["POST"])
+@role_required("staff")
+def movie_delete(movie_id):
+    db = get_db()
+    staff_user_id = ObjectId(session["user_id"])
+    try:
+        movie_oid = ObjectId(movie_id)
+    except Exception:
+        abort(404)
+    movie = db.movies.find_one({"_id": movie_oid})
+    if not movie:
+        abort(404)
+    if movie.get("created_by_staff") != staff_user_id:
+        abort(403)
+
+    dependencies = {
+        "showtimes": db.showtimes.count_documents({"movie_id": movie_oid}),
+        "bookings": db.bookings.count_documents({"movie_id": movie_oid}),
+        "reviews": db.reviews.count_documents({"movie_id": movie_oid}),
+    }
+    now = datetime.now(UTC).replace(tzinfo=None)
+    if any(dependencies.values()):
+        db.movies.update_one({"_id": movie_oid}, {"$set": {
+            "status": "Archived", "archived_at": now, "archived_by": staff_user_id}})
+        log_audit("STAFF_ARCHIVE_MOVIE", "movie", movie_oid,
+                  f"Delete requested; retained dependencies {dependencies}")
+        flash("Movie has showtime, booking, or review history, so it was archived instead of erased.", "warning")
+    else:
+        db.movies.delete_one({"_id": movie_oid, "created_by_staff": staff_user_id})
+        log_audit("STAFF_DELETE_MOVIE", "movie", movie_oid, f"Deleted unscheduled catalog entry {movie.get('title', '')}")
+        flash("Movie deleted. Its uploaded poster file was retained for recovery.", "success")
+    return redirect(url_for("staff.movies"))

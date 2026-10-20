@@ -13,7 +13,7 @@
         <div>
             <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.3rem;">
                 <h1 style="font-size: 1.6rem; font-family: var(--font-heading); margin: 0;">{{ movie.title }}</h1>
-                <span class="chip" style="background: rgba(37,99,235,0.2); color: #93c5fd;">{{ movie.language }}</span>
+                <span class="chip" style="background: rgba(37,99,235,0.2); color: #1e5bb8;">{{ movie.language }}</span>
                 {% if employee_benefits %}
                 <span class="badge" style="background:#15803d; color:white;">WORKER REWARD · {{ employee_benefits.available_credits }} AVAILABLE</span>
                 {% elif customer_tier == 'PRO' %}
@@ -25,7 +25,7 @@
                 {% endif %}
             </div>
             <p style="color: var(--text-muted); font-size: 0.9rem;">
-                🏛 {{ theater.name }} • {{ screen.name }} ({{ screen.screen_type }}) • 📅 {{ showtime.show_date }} at <strong style="color: #fff;">{{ showtime.start_time }}</strong>
+                🏛 {{ theater.name }} • {{ screen.name }} ({{ screen.screen_type }}) • 📅 {{ showtime.show_date }} at <strong style="color: var(--text-light);">{{ showtime.start_time }}</strong>
             </p>
         </div>
         <div style="text-align: right;">
@@ -77,7 +77,7 @@
     <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.8rem; margin-top: 2.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1.5rem;">
         <div>
             <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.2rem;">Selected Seats:</div>
-            <div id="selected-seats-display" style="font-size: 1.2rem; font-weight: 700; color: #fff;">None</div>
+            <div id="selected-seats-display" style="font-size: 1.2rem; font-weight: 700; color: var(--text-light);">None</div>
         </div>
 
         <div>

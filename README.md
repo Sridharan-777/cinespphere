@@ -12,10 +12,14 @@ py -3.11 -m venv venv
 Copy-Item .env.example .env
 # Edit .env with a long SECRET_KEY and your MongoDB settings.
 .\venv\Scripts\python.exe -m cinesphere.scripts.seed_database
+.\venv\Scripts\python.exe -m cinesphere.scripts.add_requested_movies
+.\venv\Scripts\python.exe -m cinesphere.scripts.refresh_showtimes --days 7
 .\venv\Scripts\python.exe -m cinesphere.run
 ```
 
 Open `http://localhost:3000`. The seed command intentionally refuses to reset a non-empty database unless `CINESPHERE_ALLOW_DEVELOPMENT_RESET=YES` is explicitly set. Never enable that override against production data.
+
+The refresh command is safe for an existing database: it adds missing future shows for active screens and leaves historical shows and bookings untouched. Run it again whenever the demo schedule has expired.
 
 Run the test suite with:
 

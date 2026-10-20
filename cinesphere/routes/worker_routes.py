@@ -8,6 +8,7 @@ from cinesphere.utils.decorators import role_required
 from cinesphere.utils.audit import log_audit
 from cinesphere.services.ticket_service import TicketService
 from cinesphere.services.reward_service import RewardService
+from cinesphere.services.payroll_service import PayrollService
 
 worker_bp = Blueprint("worker", __name__)
 
@@ -37,13 +38,26 @@ def dashboard():
                        if calendar.weekday(now.year, now.month, day) < 5)
     completed_tasks = db.tasks.count_documents({"assigned_worker_id": worker["_id"], "status": "Completed"})
     eligibility = RewardService.eligibility(worker["_id"])
+    reward_coins = int(worker.get("bonus_coins", 0) or 0)
+    now = datetime.now(UTC).replace(tzinfo=None)
+    available_rewards = db.reward_credits.count_documents({
+        "worker_id": uid,
+        "status": "available",
+        "expires_at": {"$gt": now},
+    })
+    latest_payroll = db.payroll.find_one(
+        {"worker_id": uid, "status": {"$in": ["Approved", "Paid (recorded)"]}},
+        sort=[("period", -1)],
+    )
     worker_metrics = {
         "attendance_percentage": round((attended_days / working_days) * 100, 1) if working_days else 0,
         "attended_days": attended_days,
         "working_days": working_days,
         "rewards_collected": db.reward_credits.count_documents({"worker_id": uid, "status": "consumed"}),
-        "reward_coins": 0,
+        "available_rewards": available_rewards,
+        "reward_coins": reward_coins,
         "eligibility": eligibility,
+        "latest_payroll": latest_payroll,
     }
 
     # Footfall & approaching customers statistics
@@ -62,11 +76,9 @@ def dashboard():
         "active_shows": active_shows
     }
 
-    now = datetime.now(UTC).replace(tzinfo=None)
     benefit_bookings = list(db.bookings.find({"customer_id": uid, "funding_source": "worker_reward"}).sort("created_at", -1))
-    available_credits = db.reward_credits.count_documents({"worker_id": uid, "status": "available", "expires_at": {"$gt": now}})
     benefits = {
-        "free_remaining": available_credits,
+        "free_remaining": available_rewards,
         "family_remaining": 0,
         "bookings": benefit_bookings,
         "month": RewardService.cycle_key(),
@@ -98,7 +110,12 @@ def update_task_status(task_id):
     uid = ObjectId(session["user_id"])
     worker = find_worker(uid)
     
-    task = db.tasks.find_one({"_id": ObjectId(task_id), "assigned_worker_id": worker["_id"]})
+    try:
+        task_oid = ObjectId(task_id)
+    except Exception:
+        flash("Invalid task identifier.", "danger")
+        return redirect(url_for("worker.dashboard"))
+    task = db.tasks.find_one({"_id": task_oid, "assigned_worker_id": worker["_id"]})
     if not task:
         flash("Task not found or not assigned to you.", "danger")
         return redirect(url_for("worker.dashboard"))
@@ -151,9 +168,28 @@ def attendance():
             flash("That attendance action is not currently available.", "warning")
         return redirect(url_for("worker.attendance"))
 
-    records = list(db.attendance.find({"worker_id": worker["_id"]}).sort("date", -1).limit(30))
+    records = list(db.attendance.find({"worker_id": worker["_id"]}).sort("date", -1).limit(60))
     today_rec = db.attendance.find_one({"worker_id": worker["_id"], "date": today_str})
-    return render_template("worker/attendance.html", worker=worker, records=records, today_rec=today_rec)
+    month_prefix = today_str[:7]
+    month_records = [record for record in records if str(record.get("date", "")).startswith(month_prefix)]
+    present_statuses = {"Present", "Corrected Present"}
+    present_days = sum(1 for record in month_records if record.get("status") in present_statuses)
+    scheduled_shifts = db.shifts.count_documents({
+        "worker_id": worker["_id"],
+        "date": {"$regex": f"^{month_prefix}"},
+        "status": {"$in": ["Scheduled", "Completed"]},
+    })
+    attendance_summary = {
+        "cycle": month_prefix,
+        "present_days": present_days,
+        "scheduled_shifts": scheduled_shifts,
+        "completed_shifts": sum(1 for record in month_records if record.get("check_out")),
+        "open_shift": any(record.get("check_in") and not record.get("check_out") for record in month_records),
+        "attendance_rate": round(min(present_days, scheduled_shifts) / scheduled_shifts * 100, 1)
+        if scheduled_shifts else None,
+    }
+    return render_template("worker/attendance.html", worker=worker, records=records,
+                           today_rec=today_rec, attendance_summary=attendance_summary)
 
 @worker_bp.route("/worker/profile")
 @role_required("worker")
@@ -170,10 +206,23 @@ def profile():
 def rewards():
     db = get_db()
     uid = ObjectId(session["user_id"])
+    worker = find_worker(uid)
+    now = datetime.now(UTC).replace(tzinfo=None)
     credits = list(db.reward_credits.find({"worker_id": uid}).sort("issued_at", -1))
     awards = list(db.reward_awards.find({"worker_id": uid}).sort("cycle", -1))
+    reward_summary = {
+        "available": sum(1 for credit in credits if credit.get("status") == "available"
+                         and credit.get("expires_at") and credit["expires_at"] > now),
+        "reserved": sum(1 for credit in credits if credit.get("status") == "reserved"),
+        "used": sum(1 for credit in credits if credit.get("status") == "consumed"),
+        "expired": sum(1 for credit in credits if credit.get("status") == "expired"
+                       or (credit.get("status") == "available" and credit.get("expires_at")
+                           and credit["expires_at"] <= now)),
+        "coins": int(worker.get("bonus_coins", 0) or 0) if worker else 0,
+    }
     return render_template("worker/rewards.html", policy=RewardService.policy(),
-                           eligibility=RewardService.eligibility(uid), credits=credits, awards=awards)
+                           eligibility=RewardService.eligibility(uid), credits=credits,
+                           awards=awards, reward_summary=reward_summary, now=now)
 
 
 @worker_bp.route("/worker/payroll", methods=["GET", "POST"])
@@ -181,12 +230,17 @@ def rewards():
 def payroll():
     db = get_db()
     uid = ObjectId(session["user_id"])
+    worker = find_worker(uid)
     if request.method == "POST":
         try:
             payroll_id = ObjectId(request.form.get("payroll_id"))
         except Exception:
             payroll_id = None
-        record = db.payroll.find_one({"_id": payroll_id, "worker_id": uid}) if payroll_id else None
+        record = db.payroll.find_one({
+            "_id": payroll_id,
+            "worker_id": uid,
+            "status": {"$in": ["Approved", "Paid (recorded)"]},
+        }) if payroll_id else None
         message = request.form.get("message", "").strip()
         if not record or not message:
             flash("Choose your payslip and describe the discrepancy.", "danger")
@@ -197,9 +251,14 @@ def payroll():
             log_audit("PAYROLL_DISCREPANCY_RAISED", "payroll", record["_id"], "Worker raised a discrepancy")
             flash("Payroll discrepancy sent for review.", "success")
         return redirect(url_for("worker.payroll"))
-    records = list(db.payroll.find({"worker_id": uid}).sort("period", -1))
+    records = list(db.payroll.find({
+        "worker_id": uid,
+        "status": {"$in": ["Approved", "Paid (recorded)"]},
+    }).sort("period", -1))
     disputes = list(db.payroll_disputes.find({"worker_id": uid}).sort("created_at", -1))
-    return render_template("worker/payroll.html", records=records, disputes=disputes)
+    return render_template("worker/payroll.html", worker=worker, records=records,
+                           latest_record=records[0] if records else None,
+                           disputes=disputes, policy=PayrollService.policy())
 
 
 @worker_bp.route("/worker/admission", methods=["GET", "POST"])
@@ -209,7 +268,10 @@ def admission():
     worker = find_worker(ObjectId(session["user_id"]), active_only=True)
     duties = set(worker.get("authorized_duties", [])) if worker else set()
     if not worker or not duties.intersection({"admission", "ticket_validation", "ticket_counter"}):
-        return render_template("worker/admission.html", authorized=False, result=None), 403
+        # The navigation page remains useful to the worker and explains how to
+        # obtain the duty. An unauthorized mutation is still forbidden.
+        status_code = 403 if request.method == "POST" else 200
+        return render_template("worker/admission.html", authorized=False, result=None), status_code
     result = None
     if request.method == "POST":
         token = request.form.get("token", "").strip()

@@ -79,8 +79,8 @@
     <div style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.8rem; font-size: 0.88rem;">
         <span style="color: var(--text-muted);">Active Filters:</span>
         {% if selected_region != 'all' %}<span class="badge" style="background: rgba(245, 158, 11, 0.2); color: #fcd34d;">Region: {{ selected_region|upper }}</span>{% endif %}
-        {% if selected_lang != 'all' %}<span class="badge" style="background: rgba(59, 130, 246, 0.2); color: #93c5fd;">Language: {{ selected_lang }}</span>{% endif %}
-        {% if selected_genre != 'all' %}<span class="badge" style="background: rgba(34, 197, 94, 0.2); color: #86efac;">Genre: {{ selected_genre }}</span>{% endif %}
+        {% if selected_lang != 'all' %}<span class="badge" style="background: rgba(59, 130, 246, 0.2); color: #1e5bb8;">Language: {{ selected_lang }}</span>{% endif %}
+        {% if selected_genre != 'all' %}<span class="badge" style="background: rgba(34, 197, 94, 0.2); color: #0d7257;">Genre: {{ selected_genre }}</span>{% endif %}
         {% if selected_status != 'all' %}<span class="badge">{{ selected_status }}</span>{% endif %}
         <a href="{{ url_for('movies.movie_list') }}" style="color: var(--primary); text-decoration: underline; margin-left: 0.5rem;">Reset All</a>
     </div>

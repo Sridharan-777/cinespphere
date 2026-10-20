@@ -1,5 +1,6 @@
 import unittest
 import uuid
+from datetime import UTC, datetime
 from bson import ObjectId
 from werkzeug.security import check_password_hash
 from cinesphere.app import create_app
@@ -18,12 +19,32 @@ class CineSphereTestSuite(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"CineSphere", response.data)
 
+    def test_movie_pages_include_trailers_and_available_theaters(self):
+        movie = self.db.movies.find_one({"status": {"$ne": "Archived"}})
+        self.assertIsNotNone(movie)
+        movie_page = self.client.get(f"/movies/{movie['_id']}")
+        self.assertEqual(movie_page.status_code, 200)
+        self.assertIn(b"Watch the trailer", movie_page.data)
+
+        theater_page = self.client.get("/theaters")
+        self.assertEqual(theater_page.status_code, 200)
+        available_show = next(iter(self.db.showtimes.find({
+            "status": "active", "show_date": {"$gte": datetime.now(UTC).date().isoformat()}
+        })), None)
+        self.assertIsNotNone(available_show)
+        theater = self.db.theaters.find_one({"_id": available_show["theater_id"]})
+        self.assertIn(theater["name"].encode(), theater_page.data)
+        self.assertEqual(self.client.get(f"/theaters/{theater['_id']}").status_code, 200)
+        self.assertEqual(self.client.get(f"/booking/{available_show['_id']}/seats").status_code, 200)
+        self.assertEqual(self.client.get(f"/api/showtimes/{available_show['_id']}/seats").status_code, 200)
+        self.assertEqual(self.client.get("/api/theaters").status_code, 200)
+
     def test_role_portals_and_cross_role_denial(self):
         role_pages = {
-            "admin": ["/admin/dashboard", "/admin/theaters", "/admin/staff", "/admin/movies", "/admin/reviews", "/admin/users", "/admin/sessions", "/admin/audit-logs"],
-            "staff": ["/staff/dashboard", "/staff/customers", "/staff/workers", "/staff/shows", "/staff/tasks", "/staff/reports", "/staff/rewards", "/staff/payroll", "/staff/support"],
-            "worker": ["/worker/dashboard", "/worker/tasks", "/worker/attendance", "/worker/profile", "/worker/rewards", "/worker/payroll"],
-            "customer": ["/customer/dashboard", "/customer/bookings", "/customer/favorites", "/customer/reviews", "/customer/profile", "/customer/notifications", "/customer/rewards", "/customer/plans", "/customer/support"]
+            "admin": ["/admin/dashboard", "/admin/theaters", "/admin/staff", "/admin/movies", "/admin/reviews", "/admin/users", "/admin/sessions", "/admin/audit-logs", "/admin/rewards", "/admin/payroll", "/admin/export/report", "/admin/operations"],
+            "staff": ["/staff/dashboard", "/staff/customers", "/staff/workers", "/staff/shows", "/staff/tasks", "/staff/reports", "/staff/rewards", "/staff/payroll", "/staff/support", "/staff/movies"],
+            "worker": ["/worker/dashboard", "/worker/tasks", "/worker/attendance", "/worker/profile", "/worker/rewards", "/worker/payroll", "/worker/admission"],
+            "customer": ["/customer/dashboard", "/customer/bookings", "/customer/favorites", "/customer/reviews", "/customer/profile", "/customer/notifications", "/customer/rewards", "/customer/plans", "/customer/support", "/customer/live-shows"]
         }
         for role, pages in role_pages.items():
             user = self.db.users.find_one({"role": role, "status": "active"})
@@ -106,7 +127,13 @@ class CineSphereTestSuite(unittest.TestCase):
         self.assertEqual(self.db.bookings.count_documents({"customer_id": user["_id"]}), before)
 
     def test_prevent_double_booking(self):
-        showtime = self.db.showtimes.find_one()
+        today = datetime.now(UTC).replace(tzinfo=None).strftime("%Y-%m-%d")
+        showtime = next((show for show in self.db.showtimes.find({
+            "status": "active", "show_date": {"$gte": today}
+        }) if self.db.theaters.find_one({"_id": show.get("theater_id"), "status": "active"})
+            and self.db.screens.find_one({"_id": show.get("screen_id"), "status": "active"})), None)
+        if not showtime:
+            self.skipTest("No currently available showtime fixture")
         customer = self.db.customers.find_one()
         valid_seats = [f"{row}{number}" for row in "ABCDEF" for number in range(1, 9)]
         unique_seat = next(seat for seat in valid_seats if seat not in showtime.get("booked_seats", []))

@@ -26,7 +26,7 @@
                 <img src="{{ s.movie.poster_url if s.movie else '/static/images/default_poster.svg' }}" alt="Poster" style="width: 50px; height: 75px; object-fit: cover; border-radius: 4px;">
                 <div>
                     <h3 style="font-size: 1.15rem; margin-bottom: 0.2rem;">{{ s.movie.title if s.movie else 'Movie' }}</h3>
-                    <p style="color: var(--text-muted); font-size: 0.85rem;">{{ s.screen_name }} • Date: {{ s.show_date }} • Time: <strong style="color: #fff;">{{ s.start_time }}</strong></p>
+                    <p style="color: var(--text-muted); font-size: 0.85rem;">{{ s.screen_name }} • Date: {{ s.show_date }} • Time: <strong style="color: var(--text-light);">{{ s.start_time }}</strong> • {{ s.available_seats }} seats left</p>
                 </div>
             </div>
             <div style="display: flex; align-items: center; gap: 1.5rem;">
@@ -47,7 +47,7 @@
         {% for sc in screens %}
         <div class="stat-card">
             <h3 style="font-size: 1.1rem; margin-bottom: 0.3rem;">📺 {{ sc.name }}</h3>
-            <p style="color: var(--text-muted); font-size: 0.85rem;">Format: <strong style="color: #fff;">{{ sc.screen_type }}</strong></p>
+            <p style="color: var(--text-muted); font-size: 0.85rem;">Format: <strong style="color: var(--text-light);">{{ sc.screen_type }}</strong></p>
             <p style="color: var(--text-muted); font-size: 0.85rem;">Capacity: {{ sc.capacity }} Seats</p>
         </div>
         {% endfor %}

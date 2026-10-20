@@ -8,7 +8,13 @@ Set `TMDB_API_KEY` on the server, then run:
 .\venv\Scripts\python.exe -m cinesphere.scripts.sync_movies
 ```
 
-TMDB supplies catalog metadata only. Provider “now playing” lists are tagged as discovery input and do not create CineSphere showtimes. Local availability always requires an active future showtime in MongoDB. `RECENT_RELEASE_DAYS` controls the intended recent-release window (default 120 days); operators should review synchronized records before scheduling them. Preserve TMDB attribution in production UI and comply with its terms.
+For titles that discovery misses, pass up to ten exact searches:
+
+```powershell
+.\venv\Scripts\python.exe -m cinesphere.scripts.sync_movies "Jailer 2" "Toxic" "Vishwanath & Sons" "Bethlehem Kudumba Unit" "Bha Bha Ba"
+```
+
+TMDB supplies catalog metadata only. The importer covers India release pages and Tamil, Telugu, Malayalam, Kannada, and Hindi titles; `TMDB_SYNC_PAGES` controls its page depth. Provider “now playing” lists are tagged as discovery input and do not create CineSphere showtimes. Local availability always requires an active future showtime in MongoDB. `RECENT_RELEASE_DAYS` controls the intended recent-release window (default 120 days); operators should review synchronized records before scheduling them. Preserve TMDB attribution in production UI and comply with its terms.
 
 ## Google sign-in
 

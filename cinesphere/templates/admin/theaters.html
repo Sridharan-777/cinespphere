@@ -71,7 +71,7 @@
                     <td>
                         <strong style="color: #fcd34d;">{{ t.worker_count }} / 20</strong>
                     </td>
-                    <td><span class="badge" style="background: rgba(34, 197, 94, 0.2); color: #86efac;">Active</span></td>
+                    <td><span class="status-pill {% if t.status == 'active' %}status-success{% else %}status-draft{% endif %}">{{ 'Available' if t.status == 'active' else 'Unavailable' }}</span></td>
                     <td>
                         <a href="{{ url_for('admin.theater_details', theater_id=t._id) }}" class="btn btn-sm btn-outline">Details</a>
                     </td>

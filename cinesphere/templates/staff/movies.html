@@ -1,14 +1,55 @@
 {% extends "base.html" %}
-{% block title %}Add Movies - Staff{% endblock %}
-{% block content %}<div class="container">
-<div class="section-header"><h1 class="section-title">Movie Catalog</h1></div>
-<div class="form-card" style="padding:1.5rem;margin-bottom:2rem;"><h2>Add Movie and Poster</h2>
-<form action="{{ url_for('staff.movies') }}" method="POST" enctype="multipart/form-data" class="crud-form-grid">
-<input class="form-control" name="title" placeholder="Movie title" required><input class="form-control" name="language" value="English" required>
-<input class="form-control" name="genres" placeholder="Genres, comma separated"><input class="form-control" name="director" placeholder="Director">
-<input class="form-control" type="number" name="runtime" placeholder="Runtime"><input class="form-control" type="date" name="release_date">
-<select class="form-control" name="status"><option>Now Showing</option><option>Coming Soon</option></select><input class="form-control" type="file" name="poster" accept="image/jpeg,image/png,image/webp" required>
-<textarea class="form-control" name="overview" placeholder="Overview"></textarea><button class="btn btn-primary">Add Movie</button>
-</form></div>
-<div class="dashboard-grid">{% for m in movies %}<div class="stat-card"><img src="{{ m.poster_url }}" alt="{{ m.title }} poster" style="width:100%;max-height:260px;object-fit:cover;"><h3>{{ m.title }}</h3><p>{{ m.status }}</p></div>{% endfor %}</div>
-</div>{% endblock %}
+{% block title %}Movie Catalog - Staff{% endblock %}
+{% block content %}
+<div class="container">
+    <div class="section-header">
+        <div>
+            <h1 class="section-title">Movie catalog</h1>
+            <p>Add an accurate catalog entry and upload its official poster. A movie becomes locally bookable only after a showtime is scheduled.</p>
+        </div>
+    </div>
+
+    <div class="form-card" style="padding:1.5rem;margin-bottom:2rem;">
+        <h2>Add movie and poster</h2>
+        <form action="{{ url_for('staff.movies') }}" method="POST" enctype="multipart/form-data" class="crud-form-grid">
+            <input class="form-control" name="title" placeholder="Movie title" required>
+            <input class="form-control" name="language" value="English" required>
+            <input class="form-control" name="genres" placeholder="Genres, comma separated">
+            <input class="form-control" name="director" placeholder="Director">
+            <input class="form-control" type="number" name="runtime" min="0" placeholder="Runtime in minutes">
+            <input class="form-control" type="date" name="release_date">
+            <select class="form-control" name="status">
+                <option>Catalog</option>
+                <option>Now Showing</option>
+                <option>Coming Soon</option>
+            </select>
+            <input class="form-control" name="trailer_url" placeholder="YouTube trailer URL or video ID">
+            <label class="file-field">Official poster (JPG, PNG or WebP)
+                <input class="form-control" type="file" name="poster" accept="image/jpeg,image/png,image/webp" required>
+            </label>
+            <textarea class="form-control" name="overview" placeholder="Overview" style="grid-column:1/-1;"></textarea>
+            <button class="btn btn-primary" type="submit">Add movie</button>
+        </form>
+    </div>
+
+    <div class="dashboard-grid">
+        {% for m in movies %}
+        <article class="stat-card movie-admin-card">
+            <img src="{{ m.poster_url }}" alt="{{ m.title }} poster" loading="lazy">
+            <h3>{{ m.title }}</h3>
+            <p>{{ m.language or 'Language unavailable' }} · {{ m.status }}</p>
+            {% if m.created_by_staff == staff_user_id %}
+            <form action="{{ url_for('staff.movie_delete', movie_id=m._id) }}" method="POST"
+                  onsubmit="return confirm('Delete this movie? Records with operational history will be archived instead.');">
+                <button class="btn btn-sm btn-danger" type="submit">Delete movie</button>
+            </form>
+            {% else %}
+            <span class="muted">Managed by administrator or another staff member</span>
+            {% endif %}
+        </article>
+        {% else %}
+        <div class="empty-state">No movies in the catalog.</div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
