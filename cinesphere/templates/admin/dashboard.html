@@ -1,20 +1,24 @@
 {% extends "base.html" %}
 
-{% block title %}System Admin Dashboard — CineSphere{% endblock %}
+{% block title %}System Admin Dashboard — CineSphere Analytics{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
 
 {% block content %}
 <div class="container">
-    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 2rem; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 2rem; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1.2rem; box-shadow: var(--glass-shadow);">
         <div>
-            <span class="chip" style="background: #dc2626; color: #fff; margin-bottom: 0.5rem; display: inline-block;">CENTRAL ADMIN CONSOLE</span>
-            <h1 style="font-size: 2rem; font-family: var(--font-heading);">CineSphere Enterprise Overview</h1>
-            <p style="color: var(--text-muted); font-size: 0.9rem;">Multi-theater supervision, global staff/worker limits, and real TMDB sync.</p>
+            <span class="chip" style="background: #dc2626; color: #fff; margin-bottom: 0.5rem; display: inline-block; font-weight: 700; font-size: 0.75rem; letter-spacing: 0.5px;">CENTRAL ADMIN CONSOLE</span>
+            <h1 style="font-size: 2rem; font-family: var(--font-heading); margin: 0.3rem 0;">CineSphere Enterprise Overview</h1>
+            <p style="color: var(--text-muted); font-size: 0.95rem; margin: 0;">Multi-theater supervision, live business analytics, and system-wide personnel management.</p>
         </div>
-        <div style="display: flex; gap: 0.8rem;">
+        <div style="display: flex; gap: 0.8rem; flex-wrap: wrap;">
             <form action="{{ url_for('admin.sync_tmdb_movies') }}" method="POST">
-                <button type="submit" class="btn btn-accent">⚡ Sync Movies from TMDB</button>
+                <button type="submit" class="btn btn-accent" style="font-weight: 600;">⚡ Sync TMDB Movies</button>
             </form>
-            <a href="{{ url_for('admin.export_report') }}" class="btn" style="background-color: #10b981; color: white; border: none; font-weight: 600;">Export Users CSV</a>
+            <a href="{{ url_for('admin.export_report') }}" class="btn" style="background-color: #10b981; color: white; border: none; font-weight: 600;">Export CSV</a>
             <a href="{{ url_for('admin.theaters') }}" class="btn btn-primary">+ Add Theater</a>
         </div>
     </div>
@@ -30,19 +34,75 @@
         <div class="stat-card" style="border-top: 3px solid var(--success);">
             <div class="stat-title">Total System Bookings</div>
             <div class="stat-value" style="color: var(--success);">{{ stats.total_bookings }}</div>
-            <span style="font-size: 0.8rem; color: var(--text-muted);">{{ stats.today_bookings }} today</span>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">{{ stats.today_bookings }} booked today</span>
         </div>
 
         <div class="stat-card" style="border-top: 3px solid #2563eb;">
             <div class="stat-title">Active Theaters</div>
             <div class="stat-value" style="color: #60a5fa;">{{ stats.total_theaters }}</div>
-            <span style="font-size: 0.8rem; color: var(--text-muted);">Locations nationwide</span>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">{{ stats.total_screens }} active screens</span>
         </div>
 
         <div class="stat-card" style="border-top: 3px solid #d97706;">
-            <div class="stat-title">Total Users (RBAC)</div>
+            <div class="stat-title">Total Accounts (RBAC)</div>
             <div class="stat-value" style="color: #fcd34d;">{{ stats.total_users }}</div>
-            <span style="font-size: 0.8rem; color: var(--text-muted);">{{ stats.total_customers }} Customers • {{ stats.total_staff }} Staff • {{ stats.total_workers }} Workers</span>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">{{ stats.total_customers }} Patrons · {{ stats.total_staff }} Staff · {{ stats.total_workers }} Workers</span>
+        </div>
+    </div>
+
+    <!-- Interactive Graphs & Business Analytics Section -->
+    <div class="section-header" style="margin-top: 2.5rem; margin-bottom: 1.2rem;">
+        <div>
+            <h2 class="section-title" style="margin: 0; font-size: 1.4rem;">Executive Analytics & Velocity Trends</h2>
+            <p style="color: var(--text-muted); font-size: 0.88rem; margin: 0.2rem 0 0;">Real-time booking revenue, regional attendance, and catalog language share.</p>
+        </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+        <!-- Chart 1: Revenue Velocity -->
+        <div class="card" style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 1.6rem; box-shadow: var(--glass-shadow);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700;">Revenue Velocity (Last 7 Days)</h3>
+                <span class="badge" style="background: rgba(255, 59, 92, 0.15); color: #ff3b5c; font-size: 0.75rem; font-weight: 700;">INCOME MOMENTUM</span>
+            </div>
+            <div style="position: relative; height: 260px; width: 100%;">
+                <canvas id="revenueTrendChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Chart 2: Language Share -->
+        <div class="card" style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 1.6rem; box-shadow: var(--glass-shadow);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700;">Regional Language Share</h3>
+                <span class="badge" style="background: rgba(37, 99, 235, 0.15); color: #2563eb; font-size: 0.75rem; font-weight: 700;">PATRON PREFERENCE</span>
+            </div>
+            <div style="position: relative; height: 260px; width: 100%; display: flex; justify-content: center;">
+                <canvas id="languageShareChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 1.5rem; margin-bottom: 2.5rem;">
+        <!-- Chart 3: Theater Comparison -->
+        <div class="card" style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 1.6rem; box-shadow: var(--glass-shadow);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700;">Theater Revenue Comparison (₹)</h3>
+                <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; font-size: 0.75rem; font-weight: 700;">VENUE PERFORMANCE</span>
+            </div>
+            <div style="position: relative; height: 240px; width: 100%;">
+                <canvas id="theaterComparisonChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Chart 4: Genre Popularity -->
+        <div class="card" style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 1.6rem; box-shadow: var(--glass-shadow);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700;">Catalog Genre Breakdown</h3>
+                <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; font-size: 0.75rem; font-weight: 700;">CATALOG DIVERSITY</span>
+            </div>
+            <div style="position: relative; height: 240px; width: 100%;">
+                <canvas id="genreBreakdownChart"></canvas>
+            </div>
         </div>
     </div>
 
@@ -80,7 +140,7 @@
     </div>
 
     <!-- System Audit Log preview -->
-    <div class="section-header" style="margin-top: 2rem;">
+    <div class="section-header" style="margin-top: 2.5rem;">
         <h2 class="section-title">Security & Audit Activity Trail</h2>
         <a href="{{ url_for('admin.audit_logs') }}" class="btn btn-sm btn-outline">Full Audit Logs</a>
     </div>
@@ -89,29 +149,172 @@
         <table class="custom-table">
             <thead>
                 <tr>
-                    <th>Timestamp</th>
+                    <th style="white-space: nowrap;">Timestamp</th>
                     <th>User</th>
-                    <th>Role</th>
-                    <th>Action</th>
-                    <th>Entity</th>
+                    <th style="white-space: nowrap;">Role</th>
+                    <th style="white-space: nowrap;">Action</th>
+                    <th style="white-space: nowrap;">Entity</th>
                     <th>Description</th>
                 </tr>
             </thead>
             <tbody>
                 {% for log in recent_logs %}
                 <tr>
-                    <td>{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') if log.created_at else '' }}</td>
-                    <td>{{ log.user_email }}</td>
-                    <td><span class="role-tag role-{{ log.role }}">{{ log.role }}</span></td>
-                    <td><code>{{ log.action }}</code></td>
-                    <td>{{ log.entity }}</td>
+                    <td style="white-space: nowrap;">{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') if log.created_at else '' }}</td>
+                    <td><strong>{{ log.user_email }}</strong></td>
+                    <td style="white-space: nowrap;"><span class="role-tag role-{{ log.role }}">{{ log.role }}</span></td>
+                    <td style="white-space: nowrap;"><code>{{ log.action }}</code></td>
+                    <td style="white-space: nowrap;">{{ log.entity }}</td>
                     <td>{{ log.description }}</td>
                 </tr>
                 {% else %}
-                <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No audit trails recorded.</td></tr>
+                <tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">No audit trails recorded.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const analytics = {{ analytics|tojson }};
+
+    // 1. Revenue Velocity Trend Line Chart
+    const ctxRevenue = document.getElementById('revenueTrendChart')?.getContext('2d');
+    if (ctxRevenue && analytics?.trend) {
+        new Chart(ctxRevenue, {
+            type: 'line',
+            data: {
+                labels: analytics.trend.labels,
+                datasets: [
+                    {
+                        label: 'Gross Box Office (₹)',
+                        data: analytics.trend.revenue,
+                        borderColor: '#ff3b5c',
+                        backgroundColor: 'rgba(255, 59, 92, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.35,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Tickets Confirmed',
+                        data: analytics.trend.bookings,
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'transparent',
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        tension: 0.35,
+                        yAxisID: 'y1'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } }
+                },
+                scales: {
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        ticks: { callback: v => '₹' + v.toLocaleString('en-IN') }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        grid: { drawOnChartArea: false }
+                    }
+                }
+            }
+        });
+    }
+
+    // 2. Language Market Share Doughnut Chart
+    const ctxLang = document.getElementById('languageShareChart')?.getContext('2d');
+    if (ctxLang && analytics?.language) {
+        new Chart(ctxLang, {
+            type: 'doughnut',
+            data: {
+                labels: analytics.language.labels,
+                datasets: [{
+                    data: analytics.language.counts,
+                    backgroundColor: ['#ff3b5c', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#64748b'],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } }
+                },
+                cutout: '65%'
+            }
+        });
+    }
+
+    // 3. Theater Comparison Bar Chart
+    const ctxTheater = document.getElementById('theaterComparisonChart')?.getContext('2d');
+    if (ctxTheater && analytics?.theater) {
+        new Chart(ctxTheater, {
+            type: 'bar',
+            data: {
+                labels: analytics.theater.names,
+                datasets: [
+                    {
+                        label: 'Total Revenue (₹)',
+                        data: analytics.theater.revenues,
+                        backgroundColor: 'rgba(16, 185, 129, 0.75)',
+                        borderColor: '#10b981',
+                        borderWidth: 1,
+                        borderRadius: 6
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        ticks: { callback: v => '₹' + v.toLocaleString('en-IN') }
+                    }
+                }
+            }
+        });
+    }
+
+    // 4. Genre Breakdown Horizontal Bar Chart
+    const ctxGenre = document.getElementById('genreBreakdownChart')?.getContext('2d');
+    if (ctxGenre && analytics?.genres) {
+        new Chart(ctxGenre, {
+            type: 'bar',
+            data: {
+                labels: analytics.genres.labels,
+                datasets: [{
+                    label: 'Movie Titles',
+                    data: analytics.genres.counts,
+                    backgroundColor: 'rgba(245, 158, 11, 0.75)',
+                    borderColor: '#f59e0b',
+                    borderWidth: 1,
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
+});
+</script>
 {% endblock %}

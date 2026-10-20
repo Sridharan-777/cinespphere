@@ -1,24 +1,350 @@
 {% extends "base.html" %}
-{% block title %}Operations center — Admin{% endblock %}
+{% block title %}Operations Center — System Admin — CineSphere{% endblock %}
 {% block content %}
 <div class="container management-page">
-  <header class="page-heading"><span class="eyebrow">System-wide control</span><h1>Operations center</h1><p>Use the section menu to manage people, attendance, tasks, bookings and rewards without a wall of forms.</p></header>
-  <nav class="operations-nav" aria-label="Operations sections"><a href="#workers">Workers <b>{{ workers|length }}</b></a><a href="#attendance">Attendance <b>{{ attendance|length }}</b></a><a href="#tasks">Tasks <b>{{ tasks|length }}</b></a><a href="#bookings">Bookings <b>{{ bookings|length }}</b></a><a href="#rewards">Rewards <b>{{ rewards|length }}</b></a></nav>
+  <header class="page-heading" style="margin-bottom: 2rem;">
+    <span class="eyebrow" style="color: var(--primary); font-weight: 700; text-transform: uppercase; font-size: 0.82rem; letter-spacing: 1px;">Admin Console</span>
+    <h1 style="font-size: 2rem; margin: 0.4rem 0;">Operations Center</h1>
+    <p style="color: var(--text-muted); font-size: 0.95rem;">System-wide personnel control, live duty assignments, shift attendance correction, and audited transaction ledger.</p>
+  </header>
 
-  <section id="workers" class="operations-section"><div class="operations-section-heading"><div><span class="section-icon">W</span><h2>Workers</h2><p>Create accounts and maintain employment details.</p></div><details class="primary-drawer"><summary>+ Create worker</summary><form action="{{ url_for('admin.operations_worker_create') }}" method="POST" class="crud-form-grid panel-form"><label>Name<input name="name" required></label><label>Email<input name="email" type="email" required></label><label>Phone<input name="phone"></label><label>Temporary password<input name="password" value="Worker@1234" required></label><label>Theater<select name="theater_id" required>{% for t in theaters %}<option value="{{ t._id }}">{{ t.name }}</option>{% endfor %}</select></label><label>Department<input name="department"></label><label>Designation<input name="designation"></label><label>Monthly salary<input name="salary" type="number" value="22000"></label><label>Shift<input name="shift_timings" value="09:00 AM - 05:30 PM"></label><button class="btn btn-primary">Create worker</button></form></details></div>
-    <div class="record-list">{% for w in workers %}<article class="record-row"><div><strong>{{ w.name }}</strong><span>{{ w.employee_code }} · {{ w.department }}</span></div><div><strong>₹{{ w.monthly_salary or 0 }}</strong><span>{{ w.theater_name }}</span></div><span class="status-pill status-{{ w.status }}">{{ w.status|title }}</span><details class="edit-drawer"><summary>Edit</summary><form action="{{ url_for('admin.operations_worker_update', worker_id=w._id) }}" method="POST" class="compact-form"><label>Name<input name="name" value="{{ w.name }}"></label><label>Department<input name="department" value="{{ w.department }}"></label><label>Salary<input name="salary" type="number" value="{{ w.monthly_salary }}"></label><label>Reward coins<input name="bonus_coins" type="number" value="{{ w.bonus_coins or 0 }}"></label><label>Status<select name="status"><option {% if w.status=='active' %}selected{% endif %}>active</option><option {% if w.status=='inactive' %}selected{% endif %}>inactive</option></select></label><button class="btn btn-primary btn-sm">Save</button></form></details></article>{% else %}<p class="empty-copy">No workers.</p>{% endfor %}</div>
+  <!-- Sticky Top Operations Navigation Bar -->
+  <nav class="operations-nav" aria-label="Operations sections">
+    <a href="#workers" class="op-tab">Workers <span class="op-count">{{ workers|length }}</span></a>
+    <a href="#attendance" class="op-tab">Attendance <span class="op-count">{{ attendance|length }}</span></a>
+    <a href="#tasks" class="op-tab">Tasks <span class="op-count">{{ tasks|length }}</span></a>
+    <a href="#bookings" class="op-tab">Bookings <span class="op-count">{{ bookings|length }}</span></a>
+    <a href="#rewards" class="op-tab">Rewards <span class="op-count">{{ rewards|length }}</span></a>
+  </nav>
+
+  <!-- WORKERS SECTION -->
+  <section id="workers" class="operations-section">
+    <div class="operations-section-heading">
+      <div>
+        <div style="display: flex; align-items: center; gap: 0.6rem;">
+          <span class="section-icon blue">W</span>
+          <h2 style="margin: 0; font-size: 1.4rem;">Field Workers</h2>
+        </div>
+        <p style="color: var(--text-muted); margin: 0.3rem 0 0; font-size: 0.9rem;">Maintain active field personnel, role designation, salary, and theater assignments.</p>
+      </div>
+      <details class="primary-drawer">
+        <summary class="btn btn-primary">+ Create Worker</summary>
+        <form action="{{ url_for('admin.operations_worker_create') }}" method="POST" class="crud-form-grid panel-form">
+          <label>Full Name<input name="name" class="form-control" required placeholder="Aarav Sharma"></label>
+          <label>Email Address<input name="email" type="email" class="form-control" required placeholder="worker@cinesphere.com"></label>
+          <label>Phone<input name="phone" class="form-control" placeholder="+91 9811000000"></label>
+          <label>Initial Password<input name="password" class="form-control" value="Worker@1234" required></label>
+          <label>Theater
+            <select name="theater_id" class="form-control" required>
+              {% for t in theaters %}
+              <option value="{{ t._id }}">{{ t.name }} ({{ t.city }})</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>Department
+            <select name="department" class="form-control">
+              <option value="Auditorium Operations">Auditorium Operations</option>
+              <option value="Projection & Audio">Projection & Audio</option>
+              <option value="Housekeeping">Housekeeping</option>
+              <option value="Facility Maintenance">Facility Maintenance</option>
+              <option value="Security & Safety">Security & Safety</option>
+            </select>
+          </label>
+          <label>Designation<input name="designation" class="form-control" value="Operations Specialist"></label>
+          <label>Monthly Salary (₹)<input name="salary" type="number" class="form-control" value="22000"></label>
+          <label>Shift Schedule<input name="shift_timings" class="form-control" value="09:00 AM - 05:30 PM"></label>
+          <div style="grid-column: 1 / -1; margin-top: 0.5rem;">
+            <button class="btn btn-primary" type="submit">Confirm & Add Worker</button>
+          </div>
+        </form>
+      </details>
+    </div>
+
+    <div class="record-list">
+      {% for w in workers %}
+      <article class="record-row">
+        <div class="record-main">
+          <strong>{{ w.name }}</strong>
+          <span class="record-sub"><code>{{ w.employee_code }}</code> · {{ w.department }}</span>
+        </div>
+        <div class="record-details">
+          <strong style="color: var(--accent);">₹{{ w.monthly_salary or 0 }}</strong>
+          <span class="record-sub">{{ w.theater_name }}</span>
+        </div>
+        <span class="status-pill status-{{ w.status }}">{{ w.status|title }}</span>
+        <div class="record-actions">
+          <details class="edit-drawer">
+            <summary class="btn btn-sm btn-outline">Edit</summary>
+            <div class="drawer-popover">
+              <form action="{{ url_for('admin.operations_worker_update', worker_id=w._id) }}" method="POST" class="compact-form">
+                <h4 style="margin: 0 0 0.8rem; font-size: 1rem;">Edit Worker: {{ w.name }}</h4>
+                <label>Name<input name="name" class="form-control" value="{{ w.name }}"></label>
+                <label>Department<input name="department" class="form-control" value="{{ w.department }}"></label>
+                <label>Monthly Salary (₹)<input name="salary" type="number" class="form-control" value="{{ w.monthly_salary }}"></label>
+                <label>Reward Coins<input name="bonus_coins" type="number" class="form-control" value="{{ w.bonus_coins or 0 }}"></label>
+                <label>Status
+                  <select name="status" class="form-control">
+                    <option value="active" {% if w.status=='active' %}selected{% endif %}>Active</option>
+                    <option value="inactive" {% if w.status=='inactive' %}selected{% endif %}>Inactive</option>
+                  </select>
+                </label>
+                <div style="margin-top: 0.8rem; display: flex; gap: 0.5rem;">
+                  <button class="btn btn-primary btn-sm" type="submit">Save Changes</button>
+                </div>
+              </form>
+            </div>
+          </details>
+          <form action="{{ url_for('admin.operations_worker_delete', worker_id=w._id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete/deactivate worker {{ w.name }}? Their records will be archived.');" style="display: inline-block;">
+            <button type="submit" class="btn btn-sm btn-danger" title="Deactivate and delete worker">Delete</button>
+          </form>
+        </div>
+      </article>
+      {% else %}
+      <p class="empty-copy">No workers registered in database.</p>
+      {% endfor %}
+    </div>
   </section>
 
-  <section id="attendance" class="operations-section"><div class="operations-section-heading"><div><span class="section-icon green">A</span><h2>Attendance</h2><p>Correct daily clock records with an audit reason.</p></div><details class="primary-drawer"><summary>+ Record attendance</summary><form action="{{ url_for('admin.operations_attendance_create') }}" method="POST" class="crud-form-grid panel-form"><label>Worker<select name="worker_id">{% for w in workers %}<option value="{{ w._id }}">{{ w.name }}</option>{% endfor %}</select></label><label>Date<input type="date" name="date" required></label><label>Check in<input name="check_in" placeholder="09:00 AM"></label><label>Check out<input name="check_out" placeholder="05:30 PM"></label><label>Status<select name="status"><option>Present</option><option>Absent</option><option>Leave</option></select></label><button class="btn btn-primary">Save record</button></form></details></div>
-    <div class="table-responsive"><table class="custom-table"><thead><tr><th>Worker</th><th>Date</th><th>In</th><th>Out</th><th>Status</th><th>Correction</th></tr></thead><tbody>{% for a in attendance %}<tr><td><strong>{{ a.worker_name }}</strong></td><td>{{ a.date }}</td><td>{{ a.check_in or '—' }}</td><td>{{ a.check_out or '—' }}</td><td>{{ a.status }}</td><td><form action="{{ url_for('admin.operations_attendance_delete', record_id=a._id) }}" method="POST" class="inline-form"><input name="reason" required placeholder="Correction reason"><button class="btn btn-danger btn-sm">Void</button></form></td></tr>{% else %}<tr><td colspan="6" class="empty-cell">No attendance records.</td></tr>{% endfor %}</tbody></table></div>
+  <!-- ATTENDANCE SECTION -->
+  <section id="attendance" class="operations-section">
+    <div class="operations-section-heading">
+      <div>
+        <div style="display: flex; align-items: center; gap: 0.6rem;">
+          <span class="section-icon green">A</span>
+          <h2 style="margin: 0; font-size: 1.4rem;">Attendance Registry & Clock Corrections</h2>
+        </div>
+        <p style="color: var(--text-muted); margin: 0.3rem 0 0; font-size: 0.9rem;">Supervise daily clock-in/out records. Corrections require an audit trail note.</p>
+      </div>
+      <details class="primary-drawer">
+        <summary class="btn btn-primary">+ Record Attendance</summary>
+        <form action="{{ url_for('admin.operations_attendance_create') }}" method="POST" class="crud-form-grid panel-form">
+          <label>Worker
+            <select name="worker_id" class="form-control" required>
+              {% for w in workers %}
+              <option value="{{ w._id }}">{{ w.name }} ({{ w.theater_name }})</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>Date<input type="date" name="date" class="form-control" required></label>
+          <label>Check In<input name="check_in" class="form-control" placeholder="09:00 AM"></label>
+          <label>Check Out<input name="check_out" class="form-control" placeholder="05:30 PM"></label>
+          <label>Status
+            <select name="status" class="form-control">
+              <option>Present</option>
+              <option>Absent</option>
+              <option>Leave</option>
+              <option>Corrected Present</option>
+            </select>
+          </label>
+          <div style="grid-column: 1 / -1; margin-top: 0.5rem;">
+            <button class="btn btn-primary" type="submit">Save Attendance Record</button>
+          </div>
+        </form>
+      </details>
+    </div>
+
+    <div class="table-responsive">
+      <table class="custom-table">
+        <thead>
+          <tr>
+            <th style="white-space: nowrap;">Worker</th>
+            <th style="white-space: nowrap;">Date</th>
+            <th style="white-space: nowrap;">In</th>
+            <th style="white-space: nowrap;">Out</th>
+            <th style="white-space: nowrap;">Status</th>
+            <th>Correction Audit</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in attendance %}
+          <tr>
+            <td style="white-space: nowrap;"><strong>{{ a.worker_name }}</strong></td>
+            <td style="white-space: nowrap;">{{ a.date }}</td>
+            <td style="white-space: nowrap;">{{ a.check_in or '—' }}</td>
+            <td style="white-space: nowrap;">{{ a.check_out or '—' }}</td>
+            <td style="white-space: nowrap;"><span class="badge {% if 'Present' in a.status %}badge-success{% elif a.status == 'Absent' %}badge-danger{% else %}badge-warning{% endif %}">{{ a.status }}</span></td>
+            <td>
+              {% if 'Voided' in a.status %}
+              <small style="color: #ef4444;">{{ a.status }} ({{ a.correction_reason }})</small>
+              {% else %}
+              <form action="{{ url_for('admin.operations_attendance_delete', record_id=a._id) }}" method="POST" class="inline-form" style="display: flex; gap: 0.5rem; align-items: center;">
+                <input name="reason" class="form-control" style="font-size: 0.82rem; padding: 0.35rem 0.6rem; min-width: 140px;" required placeholder="Correction reason">
+                <button class="btn btn-danger btn-sm" type="submit" style="white-space: nowrap;">Void</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="empty-cell">No attendance records found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </section>
 
-  <section id="tasks" class="operations-section"><div class="operations-section-heading"><div><span class="section-icon purple">T</span><h2>Tasks</h2><p>Assign work and monitor completion.</p></div><details class="primary-drawer"><summary>+ Create task</summary><form action="{{ url_for('admin.operations_task_create') }}" method="POST" class="crud-form-grid panel-form"><label>Worker<select name="worker_id">{% for w in workers %}<option value="{{ w._id }}">{{ w.name }}</option>{% endfor %}</select></label><label>Task<input name="title" required></label><label>Description<input name="description"></label><label>Priority<select name="priority"><option>Low</option><option selected>Medium</option><option>High</option></select></label><button class="btn btn-primary">Assign task</button></form></details></div>
-    <div class="record-list">{% for t in tasks %}<form action="{{ url_for('admin.operations_task_update', task_id=t._id) }}" method="POST" class="record-row task-record"><div><strong>{{ t.worker_name }}</strong><span>{{ t.description or 'No description' }}</span></div><input name="title" value="{{ t.title }}"><select name="status">{% for s in ['Pending','In Progress','Completed'] %}<option {% if t.status==s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select><select name="priority"><option selected>{{ t.priority }}</option><option>Low</option><option>Medium</option><option>High</option></select><button class="btn btn-primary btn-sm">Update</button></form>{% else %}<p class="empty-copy">No tasks.</p>{% endfor %}</div>
+  <!-- TASKS SECTION -->
+  <section id="tasks" class="operations-section">
+    <div class="operations-section-heading">
+      <div>
+        <div style="display: flex; align-items: center; gap: 0.6rem;">
+          <span class="section-icon purple">T</span>
+          <h2 style="margin: 0; font-size: 1.4rem;">Field Operations Tasks</h2>
+        </div>
+        <p style="color: var(--text-muted); margin: 0.3rem 0 0; font-size: 0.9rem;">Assign inspection, sound check, cleaning, and security tasks to theater workers.</p>
+      </div>
+      <details class="primary-drawer">
+        <summary class="btn btn-primary">+ Assign New Task</summary>
+        <form action="{{ url_for('admin.operations_task_create') }}" method="POST" class="crud-form-grid panel-form">
+          <label>Assign To Worker
+            <select name="worker_id" class="form-control" required>
+              {% for w in workers %}
+              <option value="{{ w._id }}">{{ w.name }} ({{ w.theater_name }})</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>Task Title<input name="title" class="form-control" placeholder="e.g. Calibrate Screen 1 Dolby Atmos" required></label>
+          <label class="span-2">Task Description<input name="description" class="form-control" placeholder="Verify speaker balance, test decibels, inspect emergency exits."></label>
+          <label>Priority
+            <select name="priority" class="form-control">
+              <option value="Low">Low</option>
+              <option value="Medium" selected>Medium</option>
+              <option value="High">High</option>
+            </select>
+          </label>
+          <div style="grid-column: 1 / -1; margin-top: 0.5rem;">
+            <button class="btn btn-primary" type="submit">Dispatch Task</button>
+          </div>
+        </form>
+      </details>
+    </div>
+
+    <div class="record-list">
+      {% for t in tasks %}
+      <div class="record-row task-record" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div style="flex: 1 1 260px;">
+          <strong>{{ t.worker_name }}</strong>
+          <span class="record-sub">{{ t.title }}</span>
+          <small style="color: var(--text-muted); display: block; margin-top: 0.2rem;">{{ t.description or 'Standard duty' }}</small>
+        </div>
+        <form action="{{ url_for('admin.operations_task_update', task_id=t._id) }}" method="POST" style="display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;">
+          <input name="title" class="form-control" value="{{ t.title }}" style="width: 200px; font-size: 0.85rem;">
+          <select name="status" class="form-control" style="width: 130px; font-size: 0.85rem;">
+            {% for s in ['Pending','In Progress','Completed'] %}
+            <option {% if t.status==s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+          <select name="priority" class="form-control" style="width: 100px; font-size: 0.85rem;">
+            <option value="Low" {% if t.priority=='Low' %}selected{% endif %}>Low</option>
+            <option value="Medium" {% if t.priority=='Medium' %}selected{% endif %}>Medium</option>
+            <option value="High" {% if t.priority=='High' %}selected{% endif %}>High</option>
+          </select>
+          <button class="btn btn-primary btn-sm" type="submit">Update</button>
+        </form>
+        <form action="{{ url_for('admin.operations_task_delete', task_id=t._id) }}" method="POST" onsubmit="return confirm('Cancel and delete this task?');" style="display: inline-block;">
+          <button type="submit" class="btn btn-sm btn-danger" title="Cancel this task">Delete</button>
+        </form>
+      </div>
+      {% else %}
+      <p class="empty-copy">No tasks currently queued.</p>
+      {% endfor %}
+    </div>
   </section>
 
-  <section id="bookings" class="operations-section"><div class="operations-section-heading"><div><span class="section-icon coral">B</span><h2>Booking ledger</h2><p>Financial records are read-only here; audited cancellation flows preserve history.</p></div></div><div class="table-responsive"><table class="custom-table"><thead><tr><th>Code</th><th>Movie</th><th>Customer</th><th>Seats</th><th>Amount</th><th>Status</th></tr></thead><tbody>{% for b in bookings %}<tr><td><code>{{ b.booking_code }}</code></td><td><strong>{{ b.movie_title }}</strong></td><td>{{ b.customer_snapshot.name if b.customer_snapshot else 'Customer' }}</td><td>{{ b.seats|join(', ') }}</td><td>₹{{ b.pricing.grand_total }}</td><td><span class="status-pill">{{ b.status }}</span></td></tr>{% else %}<tr><td colspan="6" class="empty-cell">No booking records.</td></tr>{% endfor %}</tbody></table></div></section>
+  <!-- BOOKINGS SECTION -->
+  <section id="bookings" class="operations-section">
+    <div class="operations-section-heading">
+      <div>
+        <div style="display: flex; align-items: center; gap: 0.6rem;">
+          <span class="section-icon coral">B</span>
+          <h2 style="margin: 0; font-size: 1.4rem;">Booking Financial Ledger</h2>
+        </div>
+        <p style="color: var(--text-muted); margin: 0.3rem 0 0; font-size: 0.9rem;">Global ticketing records across all cinemas. Status changes are audited.</p>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="custom-table">
+        <thead>
+          <tr>
+            <th style="white-space: nowrap;">Ticket Code</th>
+            <th>Movie</th>
+            <th style="white-space: nowrap;">Customer</th>
+            <th style="white-space: nowrap;">Seats</th>
+            <th style="white-space: nowrap;">Amount</th>
+            <th style="white-space: nowrap;">Status</th>
+            <th style="white-space: nowrap;">Show Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for b in bookings %}
+          <tr>
+            <td style="white-space: nowrap;"><code>{{ b.booking_code }}</code></td>
+            <td><strong>{{ b.movie_title }}</strong></td>
+            <td style="white-space: nowrap;">{{ b.customer_snapshot.name if b.customer_snapshot else 'Customer' }}</td>
+            <td style="white-space: nowrap;">{{ b.seats|join(', ') }}</td>
+            <td style="white-space: nowrap; font-weight: 700; color: var(--accent);">₹{{ b.pricing.grand_total }}</td>
+            <td style="white-space: nowrap;"><span class="badge {% if b.status == 'Confirmed' %}badge-success{% else %}badge-warning{% endif %}">{{ b.status }}</span></td>
+            <td style="white-space: nowrap; font-size: 0.85rem; color: var(--text-muted);">{{ b.show_date }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="empty-cell">No booking records found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
 
-  <section id="rewards" class="operations-section"><div class="operations-section-heading"><div><span class="section-icon gold">R</span><h2>Rewards & coins</h2><p>Post a positive award or a negative adjustment with a clear reason.</p></div><details class="primary-drawer"><summary>+ New adjustment</summary><form action="{{ url_for('admin.operations_reward_create') }}" method="POST" class="crud-form-grid panel-form"><label>Recipient<select name="user_id">{% for c in customers %}<option value="{{ c._id }}">Customer: {{ c.name }}</option>{% endfor %}{% for w in workers %}<option value="{{ w._id }}">Worker: {{ w.name }}</option>{% endfor %}</select></label><label>Points / coins<input name="amount" type="number" required></label><label>Reason<input name="reason" required></label><button class="btn btn-primary">Post adjustment</button></form></details></div><div class="record-list">{% for r in rewards %}<article class="record-row"><div><strong>{{ r.name }}</strong><span>{{ r.reason }}</span></div><strong class="reward-amount">{{ r.amount }}</strong><span>{{ r.created_at or '' }}</span></article>{% else %}<p class="empty-copy">No reward adjustments.</p>{% endfor %}</div></section>
+  <!-- REWARDS SECTION -->
+  <section id="rewards" class="operations-section">
+    <div class="operations-section-heading">
+      <div>
+        <div style="display: flex; align-items: center; gap: 0.6rem;">
+          <span class="section-icon gold">R</span>
+          <h2 style="margin: 0; font-size: 1.4rem;">Rewards & Bonus Coins Ledger</h2>
+        </div>
+        <p style="color: var(--text-muted); margin: 0.3rem 0 0; font-size: 0.9rem;">Post direct loyalty adjustments for patrons or excellence coin bonuses for workers.</p>
+      </div>
+      <details class="primary-drawer">
+        <summary class="btn btn-primary">+ Post Reward Adjustment</summary>
+        <form action="{{ url_for('admin.operations_reward_create') }}" method="POST" class="crud-form-grid panel-form">
+          <label class="span-2">Recipient
+            <select name="user_id" class="form-control" required>
+              <optgroup label="Customers">
+                {% for c in customers %}
+                <option value="{{ c._id }}">Customer: {{ c.name }} ({{ c.email }})</option>
+                {% endfor %}
+              </optgroup>
+              <optgroup label="Field Workers">
+                {% for w in workers %}
+                <option value="{{ w._id }}">Worker: {{ w.name }} ({{ w.theater_name }})</option>
+                {% endfor %}
+              </optgroup>
+            </select>
+          </label>
+          <label>Bonus Points / Coins<input name="amount" type="number" class="form-control" placeholder="100" required></label>
+          <label>Reason for Adjustment<input name="reason" class="form-control" placeholder="Excellence bonus / Service recovery" required></label>
+          <div style="grid-column: 1 / -1; margin-top: 0.5rem;">
+            <button class="btn btn-primary" type="submit">Submit Ledger Entry</button>
+          </div>
+        </form>
+      </details>
+    </div>
+
+    <div class="record-list">
+      {% for r in rewards %}
+      <article class="record-row">
+        <div>
+          <strong>{{ r.name }}</strong>
+          <span class="record-sub">{{ r.reason }}</span>
+        </div>
+        <div>
+          <span class="badge" style="background: #fef3c7; color: #92400e; font-weight: 700; font-size: 0.9rem;">+{{ r.amount }} Coins</span>
+        </div>
+        <span class="record-sub">{{ r.created_at.strftime('%d %b %Y %H:%M') if r.created_at else '' }}</span>
+      </article>
+      {% else %}
+      <p class="empty-copy">No reward adjustments recorded yet.</p>
+      {% endfor %}
+    </div>
+  </section>
 </div>
 {% endblock %}

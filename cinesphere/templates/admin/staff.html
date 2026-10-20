@@ -60,31 +60,51 @@
         <table class="custom-table">
             <thead>
                 <tr>
-                    <th>Emp Code</th>
+                    <th style="white-space: nowrap;">Emp Code</th>
                     <th>Name</th>
                     <th>Email</th>
                     <th>Assigned Theater</th>
                     <th>Designation</th>
-                    <th>Status</th>
-                    <th>Actions</th>
+                    <th style="white-space: nowrap;">Status</th>
+                    <th style="white-space: nowrap;">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for s in staff_list %}
                 <tr>
-                    <td><code>{{ s.employee_code }}</code></td>
+                    <td style="white-space: nowrap;"><code>{{ s.employee_code }}</code></td>
                     <td><strong>{{ s.name }}</strong></td>
                     <td>{{ s.email }}</td>
                     <td>{{ s.theater_name }}</td>
                     <td>{{ s.designation }}</td>
-                    <td>
+                    <td style="white-space: nowrap;">
                         <span class="badge {% if s.status == 'active' %}badge-success{% else %}badge-danger{% endif %}">
                             {{ s.status|upper }}
                         </span>
                     </td>
-                    <td>
+                    <td style="white-space: nowrap;">
+                        <details class="edit-drawer" style="display: inline-block; position: relative; margin-right: 0.35rem;">
+                            <summary class="btn btn-sm btn-outline">Edit</summary>
+                            <div class="drawer-popover" style="position: absolute; right: 0; top: 100%; margin-top: 0.5rem; background: var(--bg-card); border: 1px solid var(--border); padding: 1.2rem; border-radius: 12px; box-shadow: var(--glass-shadow); z-index: 100; width: 340px; text-align: left;">
+                                <h4 style="margin: 0 0 0.8rem; font-size: 0.95rem;">Edit Staff: {{ s.name }}</h4>
+                                <form action="{{ url_for('admin.staff_edit', staff_id=s._id) }}" method="POST" style="display: grid; gap: 0.6rem;">
+                                    <label style="font-size: 0.8rem; font-weight: 600;">Name<input class="form-control" name="name" value="{{ s.name }}" required></label>
+                                    <label style="font-size: 0.8rem; font-weight: 600;">Email<input class="form-control" type="email" name="email" value="{{ s.email }}" required></label>
+                                    <label style="font-size: 0.8rem; font-weight: 600;">Phone<input class="form-control" name="phone" value="{{ s.phone or '' }}" placeholder="Phone"></label>
+                                    <label style="font-size: 0.8rem; font-weight: 600;">Designation<input class="form-control" name="designation" value="{{ s.designation }}" required></label>
+                                    <label style="font-size: 0.8rem; font-weight: 600;">Theater
+                                        <select class="form-control" name="theater_id" required>
+                                            {% for t in theaters %}<option value="{{ t._id }}" {% if t._id == s.theater_id %}selected{% endif %}>{{ t.name }}</option>{% endfor %}
+                                        </select>
+                                    </label>
+                                    <div style="margin-top: 0.4rem;">
+                                        <button class="btn btn-primary btn-sm" type="submit">Save Changes</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </details>
                         <form action="{{ url_for('admin.staff_toggle_status', staff_id=s._id) }}" method="POST" style="display:inline-block;">
-                            <button type="submit" class="btn btn-sm {% if s.status == 'active' %}btn-danger{% else %}btn-success{% endif %}">
+                            <button type="submit" class="btn btn-sm {% if s.status == 'active' %}btn-outline{% else %}btn-success{% endif %}">
                                 {% if s.status == 'active' %}Deactivate{% else %}Activate{% endif %}
                             </button>
                         </form>
@@ -93,19 +113,9 @@
                         </form>
                     </td>
                 </tr>
+                {% else %}
                 <tr>
-                    <td colspan="7">
-                        <form action="{{ url_for('admin.staff_edit', staff_id=s._id) }}" method="POST" class="crud-form-grid">
-                            <input class="form-control" name="name" value="{{ s.name }}" required>
-                            <input class="form-control" type="email" name="email" value="{{ s.email }}" required>
-                            <input class="form-control" name="phone" value="{{ s.phone or '' }}" placeholder="Phone">
-                            <input class="form-control" name="designation" value="{{ s.designation }}" required>
-                            <select class="form-control" name="theater_id" required>
-                                {% for t in theaters %}<option value="{{ t._id }}" {% if t._id == s.theater_id %}selected{% endif %}>{{ t.name }}</option>{% endfor %}
-                            </select>
-                            <button class="btn btn-primary" type="submit">Save Staff Changes</button>
-                        </form>
-                    </td>
+                    <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">No staff registered yet.</td>
                 </tr>
                 {% endfor %}
             </tbody>

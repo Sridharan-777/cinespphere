@@ -1,4 +1,4 @@
-﻿from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
 from datetime import UTC, datetime
 import re
 from flask import current_app, abort
@@ -28,10 +28,12 @@ def dashboard():
         t["screen_count"] = db.screens.count_documents({"theater_id": t["_id"], "status": "active"})
 
     recent_logs = list(db.audit_logs.find().sort("created_at", -1).limit(6))
+    analytics = ReportService.get_admin_analytics_charts()
     return render_template("admin/dashboard.html",
                            stats=stats,
                            theaters=theaters,
-                           recent_logs=recent_logs)
+                           recent_logs=recent_logs,
+                           analytics=analytics)
 
 @admin_bp.route("/admin/theaters", methods=["GET", "POST"])
 @role_required("admin")

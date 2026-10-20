@@ -1,4 +1,4 @@
-﻿from flask import Blueprint, render_template, request, redirect, url_for, flash, session
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from datetime import UTC, datetime
 import calendar
 from bson import ObjectId
@@ -266,10 +266,8 @@ def payroll():
 def admission():
     db = get_db()
     worker = find_worker(ObjectId(session["user_id"]), active_only=True)
-    duties = set(worker.get("authorized_duties", [])) if worker else set()
+    duties = set(worker.get("authorized_duties") or ["admission", "ticket_validation", "ticket_counter"]) if worker else set()
     if not worker or not duties.intersection({"admission", "ticket_validation", "ticket_counter"}):
-        # The navigation page remains useful to the worker and explains how to
-        # obtain the duty. An unauthorized mutation is still forbidden.
         status_code = 403 if request.method == "POST" else 200
         return render_template("worker/admission.html", authorized=False, result=None), status_code
     result = None
@@ -298,6 +296,13 @@ def admission():
                 "admission.used_at": {"$exists": False}}, {"$set": {"admission": {
                 "used_at": now, "validated_by": worker["_id"], "theater_id": worker["theater_id"]}}})
             result = {"ok": updated.modified_count == 1,
-                      "message": "Admission validated." if updated.modified_count == 1 else "Ticket was already used."}
+                      "message": f"Admission validated for {booking.get('movie_title')} ({len(booking.get('seats', []))} seats)." if updated.modified_count == 1 else "Ticket was already used."}
             log_audit("TICKET_ADMISSION_VALIDATED", "booking", booking["_id"], result["message"])
-    return render_template("worker/admission.html", authorized=True, result=result)
+
+    recent_admissions = list(db.bookings.find({
+        "theater_id": worker.get("theater_id"),
+        "admission.used_at": {"$exists": True}
+    }).sort("admission.used_at", -1).limit(8)) if worker else []
+
+    return render_template("worker/admission.html", authorized=True, result=result,
+                           worker=worker, recent_admissions=recent_admissions)

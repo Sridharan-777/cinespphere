@@ -1,4 +1,4 @@
-﻿import os
+import os
 import sys
 from datetime import UTC, datetime, timedelta
 from werkzeug.security import generate_password_hash
@@ -171,7 +171,9 @@ def seed_database():
                 "monthly_salary": 22000,
                 "hourly_rate": 137.5,
                 "shift_timings": "09:00 AM - 05:30 PM",
-                "current_task": "Idle / On Standby" if w_idx > 3 else "Auditorium Sound Calibration"
+                "current_task": "Idle / On Standby" if w_idx > 3 else "Auditorium Sound Calibration",
+                "authorized_duties": ["admission", "ticket_validation", "ticket_counter"],
+                "bonus_coins": 100
             }
             worker_u = db.users.insert_one({
                 "name": f"Worker {w_idx} ({t_data['city']})",

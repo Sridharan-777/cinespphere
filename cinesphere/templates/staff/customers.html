@@ -1,25 +1,93 @@
 {% extends "base.html" %}
-{% block title %}Customer Management - Staff{% endblock %}
+{% block title %}Customer Management — Staff Console — CineSphere{% endblock %}
 {% block content %}
 <div class="container">
- <div class="section-header"><h1 class="section-title">Customer CRUD</h1></div>
- <div class="form-card" style="padding:1.5rem; margin-bottom:1.5rem;">
-  <h2>Add Customer</h2>
-  <form action="{{ url_for('staff.customer_create') }}" method="POST" class="crud-form-grid">
-   <input class="form-control" name="name" placeholder="Name" required><input class="form-control" type="email" name="email" placeholder="Email" required>
-   <input class="form-control" name="phone" placeholder="Phone"><input class="form-control" type="password" name="password" minlength="10" placeholder="Temporary password (10+ characters)" required>
-   <button class="btn btn-primary">Create Customer</button>
-  </form>
- </div>
- <form method="GET" style="display:flex;gap:.5rem;margin-bottom:1rem;"><input class="form-control" name="search" value="{{ search }}" placeholder="Search customers"><button class="btn btn-outline">Search</button></form>
- <div class="table-responsive"><table class="custom-table"><thead><tr><th>Customer</th><th>Activity at {{ theater_name }}</th><th>Status</th><th>Actions</th></tr></thead><tbody>
- {% for c in customers %}<tr><td><strong>{{ c.name }}</strong><br>{{ c.email }}</td><td>{{ c.booking_count }} bookings / {{ c.ticket_count }} tickets / Rs. {{ c.theater_spend }}</td><td>{{ c.status }}</td><td>
-  <form action="{{ url_for('staff.customer_edit', customer_id=c._id) }}" method="POST" class="crud-form-grid">
-   <input class="form-control" name="name" value="{{ c.name }}" required><input class="form-control" name="email" value="{{ c.email }}" required>
-   <select class="form-control" name="status"><option {% if c.status == 'active' %}selected{% endif %}>active</option><option {% if c.status == 'inactive' %}selected{% endif %}>inactive</option></select><button class="btn btn-sm btn-primary">Save</button>
-  </form>
-  <form action="{{ url_for('staff.customer_delete', customer_id=c._id) }}" method="POST" onsubmit="return confirm('Deactivate this customer for your theater? Their account and history will remain.');"><button class="btn btn-sm btn-danger">Deactivate here</button></form>
- </td></tr>{% else %}<tr><td colspan="4">No customers found.</td></tr>{% endfor %}
- </tbody></table></div>
+    <div class="section-header">
+        <div>
+            <h1 class="section-title">Customer Patrons Management</h1>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">View patron activity at {{ theater_name }}, register new patron accounts, and manage memberships.</p>
+        </div>
+    </div>
+
+    <div class="form-card" style="padding: 1.8rem; border-radius: 14px; border: 1px solid var(--border); background: var(--bg-card); margin-bottom: 2rem;">
+        <h3 style="margin-top: 0; font-size: 1.15rem; margin-bottom: 1rem;">Register New Customer Account</h3>
+        <form action="{{ url_for('staff.customer_create') }}" method="POST" class="crud-form-grid">
+            <input class="form-control" name="name" placeholder="Full Name" required>
+            <input class="form-control" type="email" name="email" placeholder="Email Address" required>
+            <input class="form-control" name="phone" placeholder="Phone Number">
+            <input class="form-control" type="password" name="password" minlength="8" placeholder="Initial Password (8+ chars)" required>
+            <div style="grid-column: 1 / -1; margin-top: 0.3rem;">
+                <button class="btn btn-primary" type="submit">Create Customer Account</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Search Bar -->
+    <form method="GET" style="display: flex; gap: 0.8rem; margin-bottom: 1.5rem; max-width: 500px;">
+        <input class="form-control" name="search" value="{{ search }}" placeholder="Search customer by name or email...">
+        <button class="btn btn-outline" type="submit">Search</button>
+        {% if search %}
+        <a href="{{ url_for('staff.customers_list') }}" class="btn btn-sm" style="display: flex; align-items: center; color: var(--text-muted);">Clear</a>
+        {% endif %}
+    </form>
+
+    <div class="table-responsive">
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Customer Patron</th>
+                    <th style="white-space: nowrap;">Activity at {{ theater_name }}</th>
+                    <th style="white-space: nowrap;">Status</th>
+                    <th style="white-space: nowrap;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in customers %}
+                <tr>
+                    <td>
+                        <strong>{{ c.name }}</strong>
+                        <div style="color: var(--text-muted); font-size: 0.85rem;">{{ c.email }}</div>
+                    </td>
+                    <td style="white-space: nowrap;">
+                        <span style="font-weight: 600;">{{ c.booking_count }} bookings</span> · {{ c.ticket_count }} tickets · <strong style="color: var(--accent);">₹{{ c.theater_spend }}</strong>
+                    </td>
+                    <td style="white-space: nowrap;">
+                        <span class="badge {% if c.status == 'active' %}badge-success{% else %}badge-danger{% endif %}">
+                            {{ c.status|upper }}
+                        </span>
+                    </td>
+                    <td style="white-space: nowrap;">
+                        <details class="edit-drawer" style="display: inline-block; position: relative; margin-right: 0.35rem;">
+                            <summary class="btn btn-sm btn-outline">Edit</summary>
+                            <div class="drawer-popover" style="position: absolute; right: 0; top: 100%; margin-top: 0.5rem; background: var(--bg-card); border: 1px solid var(--border); padding: 1.2rem; border-radius: 12px; box-shadow: var(--glass-shadow); z-index: 100; width: 320px; text-align: left;">
+                                <h4 style="margin: 0 0 0.8rem; font-size: 0.95rem;">Edit Customer: {{ c.name }}</h4>
+                                <form action="{{ url_for('staff.customer_edit', customer_id=c._id) }}" method="POST" style="display: grid; gap: 0.6rem;">
+                                    <label style="font-size: 0.8rem; font-weight: 600;">Full Name<input class="form-control" name="name" value="{{ c.name }}" required></label>
+                                    <label style="font-size: 0.8rem; font-weight: 600;">Email<input class="form-control" type="email" name="email" value="{{ c.email }}" required></label>
+                                    <label style="font-size: 0.8rem; font-weight: 600;">Status
+                                        <select class="form-control" name="status">
+                                            <option value="active" {% if c.status == 'active' %}selected{% endif %}>Active</option>
+                                            <option value="inactive" {% if c.status == 'inactive' %}selected{% endif %}>Inactive</option>
+                                        </select>
+                                    </label>
+                                    <div style="margin-top: 0.4rem;">
+                                        <button class="btn btn-primary btn-sm" type="submit">Save Changes</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </details>
+                        <form action="{{ url_for('staff.customer_delete', customer_id=c._id) }}" method="POST" style="display: inline-block;" onsubmit="return confirm('Deactivate this customer for {{ theater_name }}? Historical data is preserved.');">
+                            <button type="submit" class="btn btn-sm btn-outline" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.3);">Deactivate</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 2rem;">No customer patrons found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 {% endblock %}

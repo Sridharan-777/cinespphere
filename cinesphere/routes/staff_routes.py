@@ -1,4 +1,4 @@
-﻿from flask import Blueprint, render_template, request, redirect, url_for, flash, session, abort
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, abort
 from datetime import UTC, datetime
 from bson import ObjectId
 from datetime import timedelta
@@ -821,3 +821,60 @@ def movie_delete(movie_id):
         log_audit("STAFF_DELETE_MOVIE", "movie", movie_oid, f"Deleted unscheduled catalog entry {movie.get('title', '')}")
         flash("Movie deleted. Its uploaded poster file was retained for recovery.", "success")
     return redirect(url_for("staff.movies"))
+
+
+@staff_bp.route("/staff/profile", methods=["GET", "POST"])
+@role_required("staff")
+def profile():
+    db = get_db()
+    uid = ObjectId(session["user_id"])
+    user = db.users.find_one({"_id": uid})
+    staff = db.staff.find_one({"user_id": uid})
+    if not staff:
+        staff = {
+            "name": user.get("name", "Staff Member"),
+            "email": user.get("email", ""),
+            "employee_code": f"STF-{str(uid)[-6:].upper()}",
+            "designation": "Operations Supervisor",
+            "theater_id": session.get("theater_id"),
+            "theater_name": session.get("theater_name", "Assigned Cinema"),
+            "status": "active"
+        }
+
+    theater = db.theaters.find_one({"_id": ObjectId(staff["theater_id"])}) if staff.get("theater_id") else None
+    screens = list(db.screens.find({"theater_id": staff["theater_id"]})) if staff.get("theater_id") else []
+
+    if request.method == "POST":
+        new_name = request.form.get("name", "").strip()
+        new_phone = request.form.get("phone", "").strip()
+        new_password = request.form.get("password", "").strip()
+
+        updates = {}
+        if new_name:
+            updates["name"] = new_name
+            session["name"] = new_name
+        if new_phone:
+            updates["phone"] = new_phone
+        if new_password and len(new_password) >= 6:
+            from werkzeug.security import generate_password_hash
+            updates["password_hash"] = generate_password_hash(new_password)
+
+        if updates:
+            db.users.update_one({"_id": uid}, {"$set": updates})
+            db.staff.update_one({"user_id": uid}, {"$set": {"name": new_name or user.get("name")}})
+            log_audit("STAFF_UPDATE_PROFILE", "staff", uid, f"Staff updated profile: {list(updates.keys())}")
+            flash("Profile updated successfully.", "success")
+        return redirect(url_for("staff.profile"))
+
+    today_str = datetime.now(UTC).replace(tzinfo=None).strftime("%Y-%m-%d")
+    shows_today = db.showtimes.count_documents({"theater_id": staff.get("theater_id"), "show_date": today_str}) if staff.get("theater_id") else 0
+    assigned_workers = count_workers(staff.get("theater_id"), active_only=True) if staff.get("theater_id") else 0
+
+    stats = {
+        "screens_count": len(screens),
+        "shows_today": shows_today,
+        "assigned_workers": assigned_workers,
+        "theater": theater
+    }
+
+    return render_template("staff/profile.html", user=user, staff=staff, theater=theater, stats=stats, screens=screens)

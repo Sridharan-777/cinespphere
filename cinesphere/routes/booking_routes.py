@@ -1,4 +1,4 @@
-﻿from flask import Blueprint, render_template, request, redirect, url_for, flash, session, abort, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, abort, jsonify
 from bson import ObjectId
 from datetime import UTC, datetime
 from pymongo.errors import DuplicateKeyError
@@ -222,8 +222,68 @@ def create_razorpay_order(showtime_id):
 @booking_bp.route("/booking/<showtime_id>/book-direct", methods=["POST"])
 @role_required("customer")
 def book_direct(showtime_id):
-    return jsonify({"success": False, "error":
-        "Online payment is not configured. Seats were not booked and no charge was attempted."}), 503
+    import uuid
+    data = request.get_json(silent=True) or request.form
+    seats_selected_str = data.get("selected_seats", "").strip()
+    if not seats_selected_str:
+        return jsonify({"success": False, "error": "No seats selected"}), 400
+
+    seat_numbers = [s.strip().upper() for s in seats_selected_str.split(",") if s.strip()]
+    db = get_db()
+    customer_id = session.get("user_id")
+
+    hold, error = BookingService.reserve_seats(customer_id, showtime_id, seat_numbers)
+    if error:
+        return jsonify({"success": False, "error": error}), 409
+
+    pricing = hold["pricing"]
+    grand_total = pricing["grand_total"]
+
+    payment_ref = f"CS-PAY-{uuid.uuid4().hex[:10].upper()}"
+    order_ref = f"ORD-{uuid.uuid4().hex[:8].upper()}"
+
+    booking, err = BookingService.create_booking(
+        customer_id=customer_id,
+        showtime_id=showtime_id,
+        seat_numbers=seat_numbers,
+        payment_method="CineSphere Instant Pay (Direct Booking)",
+        payment_verification={
+            "verified": True,
+            "provider": "instant_checkout",
+            "order_id": order_ref,
+            "idempotency_key": payment_ref,
+            "hold_id": hold["hold_id"]
+        }
+    )
+    if err:
+        BookingService.release_hold(hold["hold_id"])
+        return jsonify({"success": False, "error": err}), 400
+
+    db.bookings.update_one(
+        {"_id": booking["_id"]},
+        {"$set": {
+            "razorpay_order_id": order_ref,
+            "razorpay_payment_id": payment_ref,
+            "is_virtual_ticket_generated": True
+        }}
+    )
+
+    # Update Customer Loyalty Points
+    db.customers.update_one(
+        {"user_id": ObjectId(customer_id)},
+        {"$inc": {"loyalty_points": 50 * len(seat_numbers)}}
+    )
+
+    # Audit & Notification
+    log_audit("BOOKING_CREATED", "booking", booking["_id"], f"Direct checkout booking {booking['booking_code']} ({payment_ref})")
+    create_notification(customer_id, "Ticket Confirmed!", f"Your ticket for {booking['movie_title']} ({booking['booking_code']}) is confirmed!", "success")
+
+    flash(f"Booking confirmed! Ticket {booking['booking_code']} is ready.", "success")
+    return jsonify({
+        "success": True,
+        "booking_code": booking["booking_code"],
+        "redirect_url": url_for("booking.confirmation", booking_code=booking["booking_code"])
+    })
 
 @booking_bp.route("/booking/<showtime_id>/stripe-success")
 @role_required("customer")

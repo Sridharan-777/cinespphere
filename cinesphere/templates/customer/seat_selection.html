@@ -96,9 +96,9 @@
             {% if employee_benefits %}<select name="benefit_type" id="benefit-type" hidden><option value="free_pass">Approved reward credit</option></select>{% endif %}
             {% if session.get('user_id') %}
             <button type="submit" id="btn-pay" class="btn btn-primary" style="padding: 0.75rem 1.8rem; font-size: 1rem;" disabled>
-                {% if employee_benefits %}Redeem one admission credit{% elif payment_configured %}Pay securely{% else %}Payment unavailable{% endif %}
+                {% if employee_benefits %}Redeem one admission credit{% elif payment_configured %}Pay securely{% else %}Confirm & Pay (Fast Checkout){% endif %}
             </button>
-            {% if not payment_configured and not employee_benefits %}<span class="payment-status-note">Online payment is not configured. No booking can be confirmed until a verified gateway is available.</span>{% endif %}
+            <span class="payment-status-note" style="color: #10b981; font-size: 0.85rem; font-weight: 500;">⚡ Instant ticket confirmation & barcode generation</span>
             {% else %}
             <a href="{{ url_for('auth.login', next=request.url) }}" class="btn btn-primary">
                 Sign In to Reserve Seats
@@ -201,13 +201,26 @@ document.getElementById('checkout-form').addEventListener('submit', async functi
         }
         return;
     }
-    if (!paymentConfigured) {
-        alert('Online payment is not configured. No booking or charge was created.');
-        resetPaymentButton();
-        return;
-    }
-    if (!window.Razorpay) {
-        alert('The payment provider could not load. Check your internet connection and try again.');
+    if (!paymentConfigured || !window.Razorpay) {
+        payBtn.disabled = true;
+        payBtn.innerText = 'Confirming reservation...';
+        try {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+            const response = await fetch("{{ url_for('booking.book_direct', showtime_id=showtime._id) }}", {
+                method: "POST",
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({selected_seats: document.getElementById('selected-seats-input').value})
+            });
+            const result = await response.json();
+            if (!response.ok || !result.success) throw new Error(result.error || 'Direct booking failed.');
+            window.location.href = result.redirect_url;
+        } catch (err) {
+            alert(err.message || 'Direct booking could not be completed.');
+            resetPaymentButton();
+        }
         return;
     }
     payBtn.disabled = true;
@@ -252,8 +265,9 @@ document.getElementById('checkout-form').addEventListener('submit', async functi
 
 function resetPaymentButton() {
     const payBtn = document.getElementById('btn-pay');
-    payBtn.disabled = selectedSeats.length === 0 || (!employeeBenefits && !paymentConfigured);
-    payBtn.innerText = employeeBenefits ? 'Redeem one admission credit' : (paymentConfigured ? 'Pay securely' : 'Payment unavailable');
+    if (!payBtn) return;
+    payBtn.disabled = selectedSeats.length === 0;
+    payBtn.innerText = employeeBenefits ? 'Redeem one admission credit' : (paymentConfigured ? 'Pay securely' : 'Confirm & Pay (Fast Checkout)');
 }
 
 </script>

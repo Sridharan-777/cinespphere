@@ -48,6 +48,7 @@
                         <a href="{{ url_for('staff.reward_reviews') }}" class="nav-link {% if request.endpoint and 'reward' in request.endpoint %}active{% endif %}">Rewards</a>
                         <a href="{{ url_for('staff.payroll') }}" class="nav-link {% if request.endpoint == 'staff.payroll' %}active{% endif %}">Payroll</a>
                         <a href="{{ url_for('staff.support') }}" class="nav-link {% if request.endpoint == 'staff.support' %}active{% endif %}">Support</a>
+                        <a href="{{ url_for('staff.profile') }}" class="nav-link {% if request.endpoint == 'staff.profile' %}active{% endif %}">Profile</a>
                     {% elif session.get('role') == 'worker' %}
                         <a href="{{ url_for('worker.dashboard') }}" class="nav-link {% if request.endpoint == 'worker.dashboard' %}active{% endif %}">Dashboard</a>
                         <a href="{{ url_for('worker.tasks_list') }}" class="nav-link {% if request.endpoint == 'worker.tasks_list' %}active{% endif %}">Tasks</a>

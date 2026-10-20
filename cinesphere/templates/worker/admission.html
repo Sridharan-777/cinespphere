@@ -1,19 +1,117 @@
 {% extends "base.html" %}
-{% block title %}Admission validation — CineSphere{% endblock %}
+{% block title %}Ticket Admission & Entry Validation — CineSphere{% endblock %}
 {% block content %}
-<div class="container narrow-page">
-    <header class="page-heading"><span class="eyebrow">Assigned duty</span><h1>Ticket admission</h1>
-        <p>Validate a signed ticket token or use the authorized manual booking lookup.</p></header>
+<div class="container" style="max-width: 960px;">
+    <header class="page-heading" style="margin-bottom: 1.5rem;">
+        <span class="eyebrow" style="color: var(--primary); font-weight: 700; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 1px;">Field Duty Console</span>
+        <h1 style="font-size: 1.8rem; margin: 0.3rem 0;">Ticket Admission & Gate Validation</h1>
+        <p style="color: var(--text-muted); font-size: 0.95rem;">Validate digital QR admission tokens or verify entry codes directly from customer tickets.</p>
+    </header>
+
     {% if not authorized %}
-    <div class="state-card state-error"><h2>Permission denied</h2><p>Your current duties do not include admission or ticket validation. Ask a theater supervisor to assign the duty.</p></div>
+    <div class="state-card state-error" style="padding: 2rem; border-radius: 12px;">
+        <h2>Duty Not Assigned</h2>
+        <p>Your current worker profile is not assigned ticket gate validation. Please consult your theater supervisor.</p>
+    </div>
     {% else %}
-    <form method="POST" class="form-card stack-form">
-        <label for="token">Signed ticket token</label><textarea id="token" name="token" rows="4" placeholder="Scan or paste the token"></textarea>
-        <span class="field-divider">or</span>
-        <label for="booking-code">Booking reference</label><input id="booking-code" name="booking_code" placeholder="CS-2026-ABC123">
-        <button class="btn btn-primary" type="submit">Validate admission</button>
-    </form>
-    {% if result %}<div class="state-card {% if result.ok %}state-success{% else %}state-error{% endif %}"><p>{{ result.message }}</p></div>{% endif %}
+    <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 1.5rem; margin-bottom: 2rem; align-items: start;">
+        <div class="form-card" style="padding: 1.8rem; border-radius: 14px; border: 1px solid var(--border); background: var(--bg-card); box-shadow: var(--glass-shadow);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem;">
+                <h3 style="margin: 0; font-size: 1.15rem;">Validate Patron Admission</h3>
+                <span class="badge badge-success" style="background: #10b981; color: white; font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 6px;">SCANNER READY</span>
+            </div>
+
+            <form method="POST" class="stack-form">
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label for="booking-code" style="font-weight: 600; font-size: 0.88rem; display: block; margin-bottom: 0.4rem;">Booking Reference Code</label>
+                    <input id="booking-code" name="booking_code" class="form-control" style="font-family: monospace; font-size: 1.1rem; letter-spacing: 1px; text-transform: uppercase;" placeholder="e.g. CS-2026-ABC123" autofocus>
+                    <small style="color: var(--text-muted); font-size: 0.8rem; display: block; margin-top: 0.3rem;">Type or paste the 12-character booking reference printed on the ticket.</small>
+                </div>
+
+                <div style="text-align: center; margin: 0.8rem 0; color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">— OR —</div>
+
+                <div class="form-group" style="margin-bottom: 1.5rem;">
+                    <label for="token" style="font-weight: 600; font-size: 0.88rem; display: block; margin-bottom: 0.4rem;">Signed QR Token</label>
+                    <textarea id="token" name="token" class="form-control" rows="3" style="font-family: monospace; font-size: 0.82rem;" placeholder="Paste raw payload from optical QR barcode scanner..."></textarea>
+                </div>
+
+                <button class="btn btn-primary" style="width: 100%; padding: 0.75rem; font-size: 1rem; font-weight: 700;" type="submit">
+                    ✓ Authorize Entry & Punch Ticket
+                </button>
+            </form>
+
+            {% if result %}
+            <div class="state-card {% if result.ok %}state-success{% else %}state-error{% endif %}" style="margin-top: 1.2rem; padding: 1.2rem; border-radius: 10px; border-left: 5px solid {% if result.ok %}#10b981{% else %}#ef4444{% endif %}; background: {% if result.ok %}#ecfdf5{% else %}#fef2f2{% endif %}; color: {% if result.ok %}#065f46{% else %}#991b1b{% endif %};">
+                <div style="display: flex; align-items: center; gap: 0.6rem;">
+                    <span style="font-size: 1.3rem;">{% if result.ok %}✅{% else %}⚠️{% endif %}</span>
+                    <strong style="font-size: 0.95rem;">{{ result.message }}</strong>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 1.2rem;">
+            <div class="card" style="padding: 1.4rem; border-radius: 14px; border: 1px solid var(--border); background: var(--bg-card);">
+                <span class="eyebrow" style="color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase;">Operator Badge</span>
+                <h3 style="margin: 0.3rem 0; font-size: 1.1rem;">{{ worker.name }}</h3>
+                <p style="margin: 0; color: var(--text-muted); font-size: 0.85rem;">{{ worker.employee_code }} · {{ worker.department }}</p>
+                <div style="margin-top: 0.8rem; padding-top: 0.8rem; border-top: 1px solid var(--border); font-size: 0.85rem;">
+                    <div>🏛 <strong>{{ worker.theater_name }}</strong></div>
+                    <div style="color: #10b981; margin-top: 0.3rem;">● Gate Admission Duty Active</div>
+                </div>
+            </div>
+
+            <div class="card" style="padding: 1.4rem; border-radius: 14px; border: 1px solid var(--border); background: var(--bg-card);">
+                <h4 style="margin: 0 0 0.8rem; font-size: 0.95rem;">Validation Guide</h4>
+                <ul style="margin: 0; padding-left: 1.2rem; font-size: 0.82rem; color: var(--text-muted); line-height: 1.6;">
+                    <li>Ask patron to show their CineSphere Virtual Ticket on phone.</li>
+                    <li>Enter booking code (e.g. <code>CS-2026-X8Y9Z0</code>).</li>
+                    <li>Verify screen number and seat allocation before directing patron to auditorium.</li>
+                    <li>Each ticket token can only be punched <strong>once</strong>.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Admissions -->
+    <div class="table-card" style="border: 1px solid var(--border); border-radius: 14px; overflow: hidden; background: var(--bg-card); box-shadow: var(--glass-shadow);">
+        <div style="padding: 1.2rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin: 0; font-size: 1.1rem;">Recent Gate Admissions (This Theater)</h3>
+            <span class="badge" style="background: #e0e7ff; color: #3730a3; font-size: 0.75rem;">LIVE LOG</span>
+        </div>
+        <div class="table-responsive">
+            <table class="custom-table" style="width: 100%;">
+                <thead>
+                    <tr>
+                        <th style="white-space: nowrap;">Ticket Code</th>
+                        <th>Movie</th>
+                        <th style="white-space: nowrap;">Seats</th>
+                        <th style="white-space: nowrap;">Admission Time</th>
+                        <th style="white-space: nowrap;">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for adm in recent_admissions %}
+                    <tr>
+                        <td style="white-space: nowrap;"><code>{{ adm.booking_code }}</code></td>
+                        <td><strong>{{ adm.movie_title }}</strong></td>
+                        <td style="white-space: nowrap;">{{ adm.seats|join(', ') }}</td>
+                        <td style="white-space: nowrap; font-size: 0.85rem; color: var(--text-muted);">
+                            {{ adm.admission.used_at.strftime('%I:%M %p · %d %b') if adm.admission and adm.admission.used_at else 'Just now' }}
+                        </td>
+                        <td style="white-space: nowrap;">
+                            <span class="badge badge-success" style="background: #10b981; color: white; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem;">ADMITTED</span>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 2rem;">No ticket validations recorded yet today at this theater gate.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
     {% endif %}
 </div>
 {% endblock %}

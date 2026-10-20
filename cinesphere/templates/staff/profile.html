@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Staff Profile — {{ staff.name }} — CineSphere{% endblock %}
+{% block content %}
+<div class="container" style="max-width: 980px;">
+    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 2rem; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1.5rem; box-shadow: var(--glass-shadow);">
+        <div style="display: flex; gap: 1.5rem; align-items: center;">
+            <div style="width: 72px; height: 72px; border-radius: 50%; background: linear-gradient(135deg, #2563eb, #3b82f6); color: white; display: grid; place-items: center; font-size: 2rem; font-weight: 800; font-family: var(--font-heading); box-shadow: 0 8px 24px rgba(37,99,235,0.3);">
+                {{ staff.name[:1]|upper }}
+            </div>
+            <div>
+                <div style="display: flex; gap: 0.6rem; align-items: center; margin-bottom: 0.3rem;">
+                    <h1 style="font-size: 1.8rem; margin: 0; font-family: var(--font-heading);">{{ staff.name }}</h1>
+                    <span class="role-tag role-staff">STAFF</span>
+                    <span class="badge badge-success" style="background: #10b981; color: white; font-size: 0.75rem;">ACTIVE</span>
+                </div>
+                <p style="color: var(--text-muted); margin: 0; font-size: 0.95rem;">
+                    <strong>{{ staff.designation }}</strong> · Emp Code: <code>{{ staff.employee_code }}</code>
+                </p>
+                <p style="color: var(--text-muted); margin: 0.2rem 0 0; font-size: 0.9rem;">
+                    🏛 {{ staff.theater_name }} {% if theater and theater.city %}({{ theater.city }}){% endif %}
+                </p>
+            </div>
+        </div>
+        <div style="text-align: right;">
+            <span class="badge" style="background: #eef2f7; color: #334155; padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600;">
+                Theater Supervisor Access
+            </span>
+        </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="dashboard-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 2rem;">
+        <div class="stat-card" style="border-top: 3px solid #2563eb;">
+            <div class="stat-title">Managed Screens</div>
+            <div class="stat-value" style="color: #2563eb;">{{ stats.screens_count }}</div>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">In {{ staff.theater_name }}</span>
+        </div>
+        <div class="stat-card" style="border-top: 3px solid #10b981;">
+            <div class="stat-title">Field Workers On Site</div>
+            <div class="stat-value" style="color: #10b981;">{{ stats.assigned_workers }} / 20</div>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Active staff quota</span>
+        </div>
+        <div class="stat-card" style="border-top: 3px solid #f59e0b;">
+            <div class="stat-title">Scheduled Shows Today</div>
+            <div class="stat-value" style="color: #f59e0b;">{{ stats.shows_today }}</div>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Screenings scheduled</span>
+        </div>
+    </div>
+
+    <!-- Details and Profile Form Grid -->
+    <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 2rem; align-items: start;">
+        <!-- Edit Profile Form -->
+        <div class="form-card" style="padding: 1.8rem; border-radius: 14px; border: 1px solid var(--border); background: var(--bg-card); box-shadow: var(--glass-shadow);">
+            <h3 style="margin-top: 0; margin-bottom: 0.5rem; font-size: 1.2rem;">Account & Profile Settings</h3>
+            <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 1.5rem;">Update your profile display name, contact phone, or password.</p>
+
+            <form action="{{ url_for('staff.profile') }}" method="POST">
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label class="form-label" style="font-weight: 600; font-size: 0.88rem; display: block; margin-bottom: 0.35rem;">Full Name</label>
+                    <input type="text" name="name" class="form-control" value="{{ user.name }}" required>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label class="form-label" style="font-weight: 600; font-size: 0.88rem; display: block; margin-bottom: 0.35rem;">Email Address (Login)</label>
+                    <input type="email" class="form-control" value="{{ user.email }}" disabled style="opacity: 0.7; cursor: not-allowed;">
+                    <small style="color: var(--text-muted); font-size: 0.78rem;">Managed by administrator console.</small>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label class="form-label" style="font-weight: 600; font-size: 0.88rem; display: block; margin-bottom: 0.35rem;">Contact Phone</label>
+                    <input type="text" name="phone" class="form-control" value="{{ user.phone or '' }}" placeholder="+91 98765 43210">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 1.5rem;">
+                    <label class="form-label" style="font-weight: 600; font-size: 0.88rem; display: block; margin-bottom: 0.35rem;">Change Password (optional)</label>
+                    <input type="password" name="password" class="form-control" placeholder="Leave blank to keep current password" minlength="6">
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="padding: 0.7rem 1.6rem; font-weight: 700;">
+                    Save Profile Changes
+                </button>
+            </form>
+        </div>
+
+        <!-- Theater Assignment Details -->
+        <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+            <div class="card" style="padding: 1.6rem; border-radius: 14px; border: 1px solid var(--border); background: var(--bg-card); box-shadow: var(--glass-shadow);">
+                <h3 style="margin-top: 0; font-size: 1.15rem; margin-bottom: 1rem;">Cinema Facility Overview</h3>
+                <div style="display: grid; gap: 0.8rem; font-size: 0.9rem;">
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">
+                        <span style="color: var(--text-muted);">Assigned Cinema</span>
+                        <strong>{{ staff.theater_name }}</strong>
+                    </div>
+                    {% if theater %}
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">
+                        <span style="color: var(--text-muted);">City & Region</span>
+                        <strong>{{ theater.city }}</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">
+                        <span style="color: var(--text-muted);">Physical Address</span>
+                        <strong style="text-align: right; max-width: 220px;">{{ theater.address }}</strong>
+                    </div>
+                    {% endif %}
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">
+                        <span style="color: var(--text-muted);">Staff Role</span>
+                        <strong>{{ staff.designation }}</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: var(--text-muted);">Supervisory Duties</span>
+                        <span style="color: #2563eb; font-weight: 600;">Shows, Workers, Payroll, QA</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" style="padding: 1.4rem; border-radius: 14px; border: 1px solid var(--border); background: var(--bg-card);">
+                <h4 style="margin: 0 0 0.8rem; font-size: 0.95rem;">Auditorium Screens in Facility</h4>
+                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    {% for sc in screens %}
+                    <div style="display: flex; justify-content: space-between; padding: 0.5rem 0.8rem; background: #f8fafc; border-radius: 8px; font-size: 0.85rem;">
+                        <span><strong>{{ sc.name }}</strong> ({{ sc.screen_type }})</span>
+                        <span style="color: var(--text-muted);">{{ sc.capacity }} seats</span>
+                    </div>
+                    {% else %}
+                    <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0;">No screens configured yet.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

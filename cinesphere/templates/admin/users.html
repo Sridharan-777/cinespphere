@@ -1,27 +1,37 @@
 {% extends "base.html" %}
 
-{% block title %}System Users — Admin Console{% endblock %}
+{% block title %}System Users — Admin Console — CineSphere{% endblock %}
 
 {% block content %}
 <div class="container">
     <div class="section-header">
-        <div><h1 class="section-title">{% if selected_role == 'customer' %}Customer Management{% else %}User Directory & Roles{% endif %}</h1><p>{% if selected_role == 'customer' %}Create, update, deactivate, or safely delete customer accounts.{% else %}Manage customers and administrators here; use the dedicated pages for staff and workers.{% endif %}</p></div>
+        <div>
+            <h1 class="section-title">{% if selected_role == 'customer' %}Customer Management{% else %}User Directory & Roles{% endif %}</h1>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">
+                {% if selected_role == 'customer' %}Create, update, deactivate, or safely delete customer accounts.{% else %}Manage system-wide user credentials, status, and role authentication.{% endif %}
+            </p>
+        </div>
     </div>
 
-    <div class="form-card" style="padding: 1.5rem; margin-bottom: 1.5rem;">
-        <h2 style="font-size: 1.15rem; margin-bottom: 1rem;">Create Customer or Administrator</h2>
+    <div class="form-card" style="padding: 1.8rem; border-radius: 14px; border: 1px solid var(--border); background: var(--bg-card); margin-bottom: 2rem;">
+        <h3 style="margin-top: 0; font-size: 1.15rem; margin-bottom: 1rem;">Create Customer or Administrator</h3>
         <form action="{{ url_for('admin.user_create') }}" method="POST" class="crud-form-grid">
             <input class="form-control" name="name" placeholder="Full name" required>
             <input class="form-control" type="email" name="email" placeholder="Email address" required>
             <input class="form-control" name="phone" placeholder="Phone number">
             <input class="form-control" type="password" name="password" placeholder="Initial password (8+ characters)" minlength="8" required>
-            <select class="form-control" name="role"><option value="customer">Customer</option><option value="admin">Administrator</option></select>
-            <button class="btn btn-primary" type="submit">Create User</button>
+            <select class="form-control" name="role">
+                <option value="customer">Customer</option>
+                <option value="admin">Administrator</option>
+            </select>
+            <div style="grid-column: 1 / -1; margin-top: 0.3rem;">
+                <button class="btn btn-primary" type="submit">Create User Account</button>
+            </div>
         </form>
     </div>
 
     <!-- Filter Pills -->
-    <div style="display: flex; gap: 0.8rem; margin-bottom: 1.5rem;">
+    <div style="display: flex; gap: 0.8rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
         <a href="{{ url_for('admin.users_list') }}" class="btn btn-sm {% if not selected_role %}btn-primary{% else %}btn-outline{% endif %}">All Roles</a>
         <a href="{{ url_for('admin.users_list', role='customer') }}" class="btn btn-sm {% if selected_role == 'customer' %}btn-primary{% else %}btn-outline{% endif %}">Customers</a>
         <a href="{{ url_for('admin.users_list', role='staff') }}" class="btn btn-sm {% if selected_role == 'staff' %}btn-primary{% else %}btn-outline{% endif %}">Staff</a>
@@ -35,11 +45,11 @@
                 <tr>
                     <th>Name</th>
                     <th>Email</th>
-                    <th>Role</th>
-                    <th>Status</th>
-                    <th>Created</th>
-                    <th>Last Login</th>
-                    <th>Actions</th>
+                    <th style="white-space: nowrap;">Role</th>
+                    <th style="white-space: nowrap;">Status</th>
+                    <th style="white-space: nowrap;">Created</th>
+                    <th style="white-space: nowrap;">Last Login</th>
+                    <th style="white-space: nowrap;">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -47,33 +57,44 @@
                 <tr>
                     <td><strong>{{ u.name }}</strong></td>
                     <td>{{ u.email }}</td>
-                    <td><span class="role-tag role-{{ u.role }}">{{ u.role }}</span></td>
-                    <td>
+                    <td style="white-space: nowrap;"><span class="role-tag role-{{ u.role }}">{{ u.role }}</span></td>
+                    <td style="white-space: nowrap;">
                         <span class="badge {% if u.status == 'active' %}badge-success{% else %}badge-danger{% endif %}">
-                            {{ u.status }}
+                            {{ u.status|upper }}
                         </span>
                     </td>
-                    <td>{{ u.created_at.strftime('%Y-%m-%d') if u.created_at else '' }}</td>
-                    <td>{{ u.last_login.strftime('%Y-%m-%d %H:%M') if u.last_login else 'Never' }}</td>
-                    <td><details><summary class="btn btn-sm btn-outline">Manage</summary></details></td>
-                </tr>
-                <tr>
-                    <td colspan="7">
-                        <form action="{{ url_for('admin.user_edit', user_id=u._id) }}" method="POST" class="crud-form-grid">
-                            <input class="form-control" name="name" value="{{ u.name }}" required>
-                            <input class="form-control" type="email" name="email" value="{{ u.email }}" required>
-                            <input class="form-control" name="phone" value="{{ u.phone or '' }}" placeholder="Phone number">
-                            <select class="form-control" name="status">
-                                <option value="active" {% if u.status == 'active' %}selected{% endif %}>Active</option>
-                                <option value="inactive" {% if u.status != 'active' %}selected{% endif %}>Inactive</option>
-                            </select>
-                            <input class="form-control" type="password" name="password" placeholder="New password (optional)" minlength="8">
-                            <button class="btn btn-primary" type="submit">Save Changes</button>
-                        </form>
-                        <form action="{{ url_for('admin.user_delete', user_id=u._id) }}" method="POST" style="margin-top:.75rem;" onsubmit="return confirm('Delete this user permanently?');">
-                            <button class="btn btn-sm btn-danger" type="submit">Delete User</button>
+                    <td style="white-space: nowrap; font-size: 0.85rem; color: var(--text-muted);">{{ u.created_at.strftime('%Y-%m-%d') if u.created_at else '' }}</td>
+                    <td style="white-space: nowrap; font-size: 0.85rem; color: var(--text-muted);">{{ u.last_login.strftime('%Y-%m-%d %H:%M') if u.last_login else 'Never' }}</td>
+                    <td style="white-space: nowrap;">
+                        <details class="edit-drawer" style="display: inline-block; position: relative; margin-right: 0.35rem;">
+                            <summary class="btn btn-sm btn-outline">Edit</summary>
+                            <div class="drawer-popover" style="position: absolute; right: 0; top: 100%; margin-top: 0.5rem; background: var(--bg-card); border: 1px solid var(--border); padding: 1.2rem; border-radius: 12px; box-shadow: var(--glass-shadow); z-index: 100; width: 320px; text-align: left;">
+                                <h4 style="margin: 0 0 0.8rem; font-size: 0.95rem;">Manage User: {{ u.name }}</h4>
+                                <form action="{{ url_for('admin.user_edit', user_id=u._id) }}" method="POST" style="display: grid; gap: 0.6rem;">
+                                    <label style="font-size: 0.8rem; font-weight: 600;">Name<input class="form-control" name="name" value="{{ u.name }}" required></label>
+                                    <label style="font-size: 0.8rem; font-weight: 600;">Email<input class="form-control" type="email" name="email" value="{{ u.email }}" required></label>
+                                    <label style="font-size: 0.8rem; font-weight: 600;">Phone<input class="form-control" name="phone" value="{{ u.phone or '' }}" placeholder="Phone number"></label>
+                                    <label style="font-size: 0.8rem; font-weight: 600;">Status
+                                        <select class="form-control" name="status">
+                                            <option value="active" {% if u.status == 'active' %}selected{% endif %}>Active</option>
+                                            <option value="inactive" {% if u.status != 'active' %}selected{% endif %}>Inactive</option>
+                                        </select>
+                                    </label>
+                                    <label style="font-size: 0.8rem; font-weight: 600;">Reset Password<input class="form-control" type="password" name="password" placeholder="New password (optional)" minlength="8"></label>
+                                    <div style="margin-top: 0.4rem;">
+                                        <button class="btn btn-primary btn-sm" type="submit">Save Changes</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </details>
+                        <form action="{{ url_for('admin.user_delete', user_id=u._id) }}" method="POST" style="display: inline-block;" onsubmit="return confirm('Permanently delete user account for {{ u.name }}?');">
+                            <button class="btn btn-sm btn-danger" type="submit">Delete</button>
                         </form>
                     </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">No users found.</td>
                 </tr>
                 {% endfor %}
             </tbody>
